@@ -46,7 +46,11 @@ You can see from the compiled binary sizes of each of the 4 targets that these n
     163328    4/9/2025    6:14:47 AM  G:\BUILDS\ToyPathTracer.git\Cpp\Windows\Release\ToyPathTracer.exe
     185344    4/9/2025    6:14:50 AM  G:\BUILDS\ToyPathTracer.git\Cpp\Windows\x64\Release\ToyPathTracer.exe
 
-On a Windows on ARM device - such as Surface Pro X, Surface Pro 9, Surface Pro 11 - run each of the 4 binaries produced (in theory you installed Visual Studio 2022 on your ARM device directly and can just press F5 on each).  What you should find, for example, on a Snapdragon X based Surface Pro 11, is that the 32-bit x86 binary renders at about 7 frames per second in CPU mode, the 64-bit x64 binary renders at about 9 frames per second in emulation (I'm testing on latest Windows Insider Canary build), and both the ARM64EC and ARM64 builds render at about... wait for it... 0.5 frames per second, or 2 seconds per frame.  That is the reference implementation of soft intrinsics in the SDK.
+For comparison, the unmodified ARM64EC-built binary using the SDK's reference implementation of soft intrinsics results in a considerably larger executable:
+
+    206336   4/10/2025    6:50:38 AM  G:\BUILDS\ToyPathTracer.git\Cpp\Windows\ARM64EC\Release\ToyPathTracer.exe
+
+On a Windows on ARM device - such as Surface Pro X, Surface Pro 9, Surface Pro 11 - run each of the 4 binaries produced (in theory you installed Visual Studio 2022 on your ARM device directly and can just press F5 on each).  What you should find, for example, on a Snapdragon X based Surface Pro 11, is that the 32-bit x86 binary renders at about 7 frames per second in CPU mode, the 64-bit x64 binary renders at about 9 frames per second in emulation (I'm testing on latest Windows Insider Canary 278xx builds), and both the ARM64EC and ARM64 builds render at about... wait for it... 0.5 frames per second, or 2 seconds per frame.  That is the reference implementation of soft intrinsics in the SDK.
 
 Thankfully, that reference implementation was specifically designed to be extensible, as most every soft intrinsic is implemented as a #define macro to re-map the intrinsic to a different function exported by SOFTINTRIN.LIB.  This is the key to how this new implementation layers on top, it simply uses an #undef to unmap each macro and replaces with a new faster implementation.
 
@@ -60,7 +64,11 @@ and do a full rebuild of each of the ARM64EC and ARM64 targets.  Presto, the new
 
 Tutorials:
 
-There are subdirectories in this project (m256_demo, dvec_demo) which demonstrate existing ARM64EC compiler bugs and how they go away once your add the #include <use_soft_intrinsics>.  Run the script RUN_DEMO.BAT in the m256_demo directory to see how to work around them.  The build script MAKE64.BAT in the dvec_demo directory builds a runnable demo of the 256-bit C++ vector classes provided by DVEC.H which can now be built as ARM64 and ARM64EC as well as legacy x86 and x64 builds.
+There are subdirectories in this project (m256_demo, dvec_demo) which demonstrate existing ARM64EC compiler bugs and how they go away once your add the #include <use_soft_intrinsics>:
+
+  - RUN_DEMO.BAT script in the m256_demo directory shows the bugs and how to add the new .H files to work around them.
+
+  - MAKE64.BAT in the dvec_demo directory builds a runnable demo of the 256-bit C++ vector classes provided by DVEC.H which can now run as native ARM64 and ARM64EC as well as legacy x86 and x64 builds.
 
 
 Implementation notes:
@@ -77,11 +85,10 @@ The file USE_SOFT_INTRINSICS.H implements the wrapper around intrin.h/windows.h 
 
   - it enables native ARM64 target by defining the USE_SOFT_INTRINSICS macro and adds SOFTINTRIN.LIB to the list of libraries.  This is what ARM64EC does automatically, but you have to do this manually for ARM64.  You can add these in the Visual Studio project itself, but by doing this in the header it makes it trivial to build from the command line using CL.EXE
 
-  - it works around (another ARM64EC compiler bug](https://developercommunity.visualstudio.com/t/VC-176-preview-1-x86-compiler-bad-cod/10291481) which also causes the compiler to stop otherwise.
+  - it works around [another ARM64EC compiler bug](https://developercommunity.visualstudio.com/t/VC-176-preview-1-x86-compiler-bad-cod/10291481) which also causes the compiler to stop otherwise.
 
 The file SOFTINTRIN_AVX2.H implements the actual soft intrisic overrides for SSE and the new soft intrinsics for AVX/AVX2.  It is #include-ed by the other header for convenience.  I'm keeping them as separate .H files since they serve entirely different purposes.  In theory once the Visual Studio compiler bugs are fixed most of USE_SOFT_INTRINSICS.H will just go away and then you will just need SOFTINTRIN_AVX2.H
 
 This initial commit today (April 9 2025) is the bare bones to get things started and unblock DVEC.H and speed up ToyPathTracer.  More demos and more new soft intrinsics will be added over time.
 
-
-
+- Darek

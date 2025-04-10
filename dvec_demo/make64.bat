@@ -36,14 +36,14 @@
 @rem for better debugging emit frame pointers and spill homeparams.
 @rem link against the static C runtime library for better backward compat.
 @rem ARM64 pure native build is the default unless -arm64EC is passed as an argument.
-set CL_ARGS=-W4 -Zi -FAsc -O2 -Oy- -MT
+set CL_ARGS=-W4 -Zi -FAsc -O2 -Oy- -MT -I..
 
 @if "%VSCMD_ARG_TGT_ARCH%" == "x64" (
     set CL_ARGS=%CL_ARGS% -homeparams
     )
 
 @if "%VSCMD_ARG_TGT_ARCH%" == "arm64" (
-    set CL_ARGS=%CL_ARGS% -arch:armv8.2 -feature:rcpc -volatile:ms -I.. %1
+    set CL_ARGS=%CL_ARGS% -arch:armv8.2 -feature:rcpc -volatile:ms %1
     )
 
 cl -c %CL_ARGS% test.c

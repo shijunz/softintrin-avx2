@@ -11,6 +11,8 @@
 //
 //  - adds dozens of new 256-bit AVX2 soft intrinsics to support using DVEC.H in ARM64/ARM64EC builds
 //
+//  - adds native twin functions (_nn_* _nn256_*) that mirror SSE/AVX naming convention and numeric behaviour
+//
 //  - smaller binary size due to linking less static code from SOFTINTRIN.LIB library from the SDK
 //
 //  - native ARM64 binaries produced by this implementation _are_ Windows 10 on ARM compatible and
@@ -21,9 +23,11 @@
 //
 //  - this is _not_ an SSE/AVX-to-NEON mapping layer per se, although that technique is used
 //
-//  - Visual C++ ARM64 toolset does not recognize m128 _m256i etc. as native vector types so in some
-//    cases the implementation relies of compiler auto-vectorization to generate NEON instructions
-//    resulting in faster code sequences than explicitly casting to and from _n128 and NEON intrinsics
+//  - each native twin is simply the original SSE/AVX name with 'mm' replaced by 'nn', e.g.:
+//      __mm_add_ss() -> _nn_add_ss()
+//
+//  - Visual C++ ARM64 toolset does not recognize m128 _m256i etc. as native vector types so
+//    the implementation relies of compiler auto-vectorization and lots of type casting
 //
 //  - ARM64 auto-vectorization arrived in Visual C/C++ 2022 17.6, using 17.12 or higher is recommended!
 //
@@ -228,12 +232,22 @@ __n128 _nn_postprocess(__n128 T, __n128 a, const __n128 b, int flags)
 {
     if (flags & _IF_SQRT_F32)
     {
+        // Native ARM64 normally returns sign bit=0 for all inputs.  On x86/x64,
+        // square root of negative must return Indefinite NaN which has sign bit=1.
+        // Mask the input with 0x80000000`80000000`80000000`8000000 and use that
+        // to propagate the original sign bits of the floats into the output.
+
         const __n128 SignMask = neon_dupqr32(0x80000000);
         T = neon_bitq(T, a, SignMask);
     }
 
     if (flags & _IF_SQRT_F64)
     {
+        // Native ARM64 normally returns sign bit=0 for all inputs.  On x86/x64,
+        // square root of negative must return Indefinite NaN which has sign bit=1.
+        // Mask the input with 0x80000000`00000000`80000000`0000000 and use that
+        // to propagate the original sign bits of the doubles into the output.
+
         const __n128 SignMask = neon_dupqr64(0x8000000000000000ull);
         T = neon_bitq(T, a, SignMask);
     }
@@ -295,14 +309,14 @@ DEFINE_N128_OP_N128_N128(__m128i, sub_epi16,    neon_subq16,    __m128i, a, __m1
 DEFINE_N128_OP_N128_N128(__m128i, sub_epi32,    neon_subq32,    __m128i, a, __m128i, b, 0)
 DEFINE_N128_OP_N128_N128(__m128i, sub_epi64,    neon_subq64,    __m128i, a, __m128i, b, 0)
 
-#undef _mm_mul_epi8
-#undef _mm_mul_epi16
+// #undef _mm_mul_epi8
+// #undef _mm_mul_epi16
 #undef _mm_mul_epi32
 // #undef _mm_mul_epi64
 
-DEFINE_N128_OP_N128_N128(__m128i, mul_epi8,     neon_mulq8,     __m128i, a, __m128i, b, 0)
-DEFINE_N128_OP_N128_N128(__m128i, mul_epi16,    neon_mulq16,    __m128i, a, __m128i, b, 0)
-DEFINE_N128_OP_N128_N128(__m128i, mul_epi32,    neon_mulq32,    __m128i, a, __m128i, b, 0)
+// DEFINE_N128_OP_N128_N128(__m128i, mul_epi8,     neon_mulq8,     __m128i, a, __m128i, b, 0)
+// DEFINE_N128_OP_N128_N128(__m128i, mul_epi16,    neon_mulq16,    __m128i, a, __m128i, b, 0)
+// DEFINE_N128_OP_N128_N128(__m128i, mul_epi32,    neon_mulq32,    __m128i, a, __m128i, b, 0)
 // DEFINE_N128_OP_N128_N128(__m128i, mul_epi64,    neon_mulq64,    __m128i, a, __m128i, b, 0)
 
 #if 0
@@ -337,10 +351,23 @@ DEFINE_N128_OP_N128_N128(__m128i, xor_si128,    neon_eorq,      __m128i, a, __m1
 #undef _mm_min_ps
 #undef _mm_max_ps
 
-DEFINE_N128_OP_N128_N128(__m128d, min_pd,       neon_fminq64,   __m128d, a, __m128d, b, _IF_SCALAR_INSERT_F32)
-DEFINE_N128_OP_N128_N128(__m128d, max_pd,       neon_fmaxq64,   __m128d, a, __m128d, b, _IF_SCALAR_INSERT_F32)
-DEFINE_N128_OP_N128_N128(__m128 , min_ps,       neon_fminq32,   __m128 , a, __m128 , b, _IF_SCALAR_INSERT_F32)
-DEFINE_N128_OP_N128_N128(__m128 , max_ps,       neon_fmaxq32,   __m128 , a, __m128 , b, _IF_SCALAR_INSERT_F32)
+DEFINE_N128_OP_N128_N128(__m128d, min_pd,       neon_fminq64,   __m128d, a, __m128d, b, 0)
+DEFINE_N128_OP_N128_N128(__m128d, max_pd,       neon_fmaxq64,   __m128d, a, __m128d, b, 0)
+DEFINE_N128_OP_N128_N128(__m128 , min_ps,       neon_fminq32,   __m128 , a, __m128 , b, 0)
+DEFINE_N128_OP_N128_N128(__m128 , max_ps,       neon_fmaxq32,   __m128 , a, __m128 , b, 0)
+
+// MINSD MAXSD
+// MINSS MAXSS
+
+#undef _mm_min_sd
+#undef _mm_max_sd
+#undef _mm_min_ss
+#undef _mm_max_ss
+
+DEFINE_N128_OP_N128_N128(__m128d, min_sd,       neon_fminq64,   __m128d, a, __m128d, b, _IF_SCALAR_INSERT_F64)
+DEFINE_N128_OP_N128_N128(__m128d, max_sd,       neon_fmaxq64,   __m128d, a, __m128d, b, _IF_SCALAR_INSERT_F64)
+DEFINE_N128_OP_N128_N128(__m128 , min_ss,       neon_fminq32,   __m128 , a, __m128 , b, _IF_SCALAR_INSERT_F32)
+DEFINE_N128_OP_N128_N128(__m128 , max_ss,       neon_fmaxq32,   __m128 , a, __m128 , b, _IF_SCALAR_INSERT_F32)
 
 // ADDPD SUBPD MULPD DIVPD
 
@@ -349,34 +376,10 @@ DEFINE_N128_OP_N128_N128(__m128 , max_ps,       neon_fmaxq32,   __m128 , a, __m1
 #undef _mm_mul_pd
 #undef _mm_div_pd
 
-DEFINE_N128_OP_N128_N128(__m128d, add_pd,       neon_faddq64,   __m128d, a, __m128d, b, _IF_SCALAR_INSERT_F64)
-DEFINE_N128_OP_N128_N128(__m128d, sub_pd,       neon_fsubq64,   __m128d, a, __m128d, b, _IF_SCALAR_INSERT_F64)
-DEFINE_N128_OP_N128_N128(__m128d, mul_pd,       neon_fmulq64,   __m128d, a, __m128d, b, _IF_SCALAR_INSERT_F64)
-DEFINE_N128_OP_N128_N128(__m128d, div_pd,       neon_fdivq64,   __m128d, a, __m128d, b, _IF_SCALAR_INSERT_F64)
-
-// ADDSS SUBSS MULSS DIVSS
-
-#undef _mm_add_ss
-#undef _mm_sub_ss
-#undef _mm_mul_ss
-#undef _mm_div_ss
-
-DEFINE_N128_OP_N128_N128(__m128 , add_ss,       neon_faddq32,   __m128 , a, __m128 , b, 0)
-DEFINE_N128_OP_N128_N128(__m128 , sub_ss,       neon_fsubq32,   __m128 , a, __m128 , b, 0)
-DEFINE_N128_OP_N128_N128(__m128 , mul_ss,       neon_fmulq32,   __m128 , a, __m128 , b, 0)
-DEFINE_N128_OP_N128_N128(__m128 , div_ss,       neon_fdivq32,   __m128 , a, __m128 , b, 0)
-
-// ADDSD SUBSD MULSD DIVSD
-
-#undef _mm_add_sd
-#undef _mm_sub_sd
-#undef _mm_mul_sd
-#undef _mm_div_sd
-
-DEFINE_N128_OP_N128_N128(__m128d, add_sd,       neon_faddq64,   __m128d, a, __m128d, b, 0)
-DEFINE_N128_OP_N128_N128(__m128d, sub_sd,       neon_fsubq64,   __m128d, a, __m128d, b, 0)
-DEFINE_N128_OP_N128_N128(__m128d, mul_sd,       neon_fmulq64,   __m128d, a, __m128d, b, 0)
-DEFINE_N128_OP_N128_N128(__m128d, div_sd,       neon_fdivq64,   __m128d, a, __m128d, b, 0)
+DEFINE_N128_OP_N128_N128(__m128d, add_pd,       neon_faddq64,   __m128d, a, __m128d, b, 0)
+DEFINE_N128_OP_N128_N128(__m128d, sub_pd,       neon_fsubq64,   __m128d, a, __m128d, b, 0)
+DEFINE_N128_OP_N128_N128(__m128d, mul_pd,       neon_fmulq64,   __m128d, a, __m128d, b, 0)
+DEFINE_N128_OP_N128_N128(__m128d, div_pd,       neon_fdivq64,   __m128d, a, __m128d, b, 0)
 
 // ADDPS SUBPS MULPS DIVPS
 
@@ -389,6 +392,30 @@ DEFINE_N128_OP_N128_N128(__m128 , add_ps,       neon_faddq32,   __m128 , a, __m1
 DEFINE_N128_OP_N128_N128(__m128 , sub_ps,       neon_fsubq32,   __m128 , a, __m128 , b, 0)
 DEFINE_N128_OP_N128_N128(__m128 , mul_ps,       neon_fmulq32,   __m128 , a, __m128 , b, 0)
 DEFINE_N128_OP_N128_N128(__m128 , div_ps,       neon_fdivq32,   __m128 , a, __m128 , b, 0)
+
+// ADDSD SUBSD MULSD DIVSD
+
+#undef _mm_add_sd
+#undef _mm_sub_sd
+#undef _mm_mul_sd
+#undef _mm_div_sd
+
+DEFINE_N128_OP_N128_N128(__m128d, add_sd,       neon_faddq64,   __m128d, a, __m128d, b, _IF_SCALAR_INSERT_F64)
+DEFINE_N128_OP_N128_N128(__m128d, sub_sd,       neon_fsubq64,   __m128d, a, __m128d, b, _IF_SCALAR_INSERT_F64)
+DEFINE_N128_OP_N128_N128(__m128d, mul_sd,       neon_fmulq64,   __m128d, a, __m128d, b, _IF_SCALAR_INSERT_F64)
+DEFINE_N128_OP_N128_N128(__m128d, div_sd,       neon_fdivq64,   __m128d, a, __m128d, b, _IF_SCALAR_INSERT_F64)
+
+// ADDSS SUBSS MULSS DIVSS
+
+#undef _mm_add_ss
+#undef _mm_sub_ss
+#undef _mm_mul_ss
+#undef _mm_div_ss
+
+DEFINE_N128_OP_N128_N128(__m128 , add_ss,       neon_faddq32,   __m128 , a, __m128 , b, _IF_SCALAR_INSERT_F32)
+DEFINE_N128_OP_N128_N128(__m128 , sub_ss,       neon_fsubq32,   __m128 , a, __m128 , b, _IF_SCALAR_INSERT_F32)
+DEFINE_N128_OP_N128_N128(__m128 , mul_ss,       neon_fmulq32,   __m128 , a, __m128 , b, _IF_SCALAR_INSERT_F32)
+DEFINE_N128_OP_N128_N128(__m128 , div_ss,       neon_fdivq32,   __m128 , a, __m128 , b, _IF_SCALAR_INSERT_F32)
 
 
 // SQRTPD SQRTSD

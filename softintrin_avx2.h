@@ -814,6 +814,7 @@ __m256d _mm256_broadcast_pd(__m128d const * pa)
 
 // VMOVUPS VMOVUPD VMOVDQA
 
+__forceinline
 __n256d _nn256_loadu_pd(double const  * pa)
 {
     __n256d T = vld2q_f64(pa);
@@ -842,6 +843,7 @@ __m256d _mm256_load_pd(double const  * pa)
     return _mm256_loadu_pd(pa);
 }
 
+__forceinline
 __n256 _nn256_loadu_ps(float const  * pa)
 {
     __n256 T = vld2q_f32(pa);
@@ -874,6 +876,7 @@ __m256 _mm256_load_ps(float const  * pa)
     return _mm256_loadu_ps(pa);
 }
 
+__forceinline
 void _nn256_storeu_pd(double * pa, __n256 a)
 {
     vst2q_f64(pa, a);
@@ -896,6 +899,7 @@ void _mm256_store_pd(double * pa, __m256d a)
     _mm256_storeu_pd(pa, a);
 }
 
+__forceinline
 void _nn256_storeu_ps(float * pa, __n256 a)
 {
     vst2q_f32(pa, a);
@@ -1136,6 +1140,7 @@ __m256 _mm256_movehdup_ps(__m256 a)
 
 // VCVT variants
 
+__forceinline
 __n128x2 _nn256_sw_cvtepi32_pd(__n128i a)
 {
     __n128x2 T;
@@ -1149,6 +1154,7 @@ __n128x2 _nn256_sw_cvtepi32_pd(__n128i a)
 }
 
 #if 0
+__forceinline
 __n128x2 _nn256_cvtepi32_pd(__n128i a)
 {
     __n128x2 T;
@@ -1167,6 +1173,7 @@ __m256d _mm256_cvtepi32_pd(__m128i a)
 }
 
 
+__forceinline
 __n128x2 _nn256_sw_cvtps_pd(__n128 a)
 {
     __n128x2 T;
@@ -1179,6 +1186,7 @@ __n128x2 _nn256_sw_cvtps_pd(__n128 a)
     return T;
 }
 
+__forceinline
 __n128x2 _nn256_cvtps_pd(__n128 a)
 {
     __n128x2 T;
@@ -1195,7 +1203,7 @@ __m256d _mm256_cvtps_pd(__m128 a)
     return _nn256_castn256_pd( _nn256_cvtps_pd(_nn128_castps_n128(a)) );
 }
 
-
+__forceinline
 __n128 _nn256_sw_cvtpd_ps(__n128x2 a)
 {
     __n128 T;
@@ -1208,6 +1216,7 @@ __n128 _nn256_sw_cvtpd_ps(__n128x2 a)
     return T;
 }
 
+__forceinline
 __n128 _nn256_cvtpd_ps(__n256 a)
 {
     __n128 T = vcvt_high_f32_f64(vcvt_f32_f64(a.val[0]), a.val[1]);

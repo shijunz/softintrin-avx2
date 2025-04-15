@@ -834,6 +834,14 @@ __m256d _mm256_loadu_pd(double const  * pa)
     return T;
 }
 
+__forceinline
+__m256d _mm256_load_pd(double const  * pa)
+{
+    // TODO: for now skip alignment check
+
+    return _mm256_loadu_pd(pa);
+}
+
 __n256 _nn256_loadu_ps(float const  * pa)
 {
     __n256 T = vld2q_f32(pa);
@@ -858,6 +866,14 @@ __m256 _mm256_loadu_ps(float const  * pa)
     return T;
 }
 
+__forceinline
+__m256 _mm256_load_ps(float const  * pa)
+{
+    // TODO: for now skip alignment check
+
+    return _mm256_loadu_ps(pa);
+}
+
 void _nn256_storeu_pd(double * pa, __n256 a)
 {
     vst2q_f64(pa, a);
@@ -870,6 +886,14 @@ void _mm256_storeu_pd(double * pa, __m256d a)
     pa[1] = a.m256d_f64[1];
     pa[2] = a.m256d_f64[2];
     pa[3] = a.m256d_f64[3];
+}
+
+__forceinline
+void _mm256_store_pd(double * pa, __m256d a)
+{
+    // TODO: for now skip alignment check
+
+    _mm256_storeu_pd(pa, a);
 }
 
 void _nn256_storeu_ps(float * pa, __n256 a)
@@ -888,6 +912,14 @@ void _mm256_storeu_ps(float * pa, __m256 a)
     pa[5] = a.m256_f32[5];
     pa[6] = a.m256_f32[6];
     pa[7] = a.m256_f32[7];
+}
+
+__forceinline
+void _mm256_store_ps(float * pa, __m256 a)
+{
+    // TODO: for now skip alignment check
+
+    _mm256_storeu_ps(pa, a);
 }
 
 #define DEFINE_N256_OP_N256_N256(rettype, name, intrin, arg1type, arg1, arg2type, arg2, flags ) \

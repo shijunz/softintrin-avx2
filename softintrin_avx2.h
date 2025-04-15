@@ -60,6 +60,19 @@ __forceinline type_out type_out ## _from_ ## type_in (type_in a) { \
 #endif
 
 //
+// Disable the /GS checks on soft intrinsics to avoid unnecessary cookie checks
+//
+
+#pragma strict_gs_check(push,off)
+
+//
+// __n128 is the twin of __m128, create the other two variants
+//
+
+typedef __n128   __n128d; // twin of __m128d
+typedef __n128   __n128i; // twin of __m128i
+
+//
 // Faster 128-bit SSE soft intrinsics (replacing existing softintrin.h implementations)
 //
 
@@ -199,6 +212,12 @@ __m128i _mm_set1_epix64(const int a)
 }
 
 __forceinline
+__n128 _nn_set1_ps(const float a)
+{
+    return neon_dupqrf32(a);
+}
+
+__forceinline
 __m128 _mm_set1_ps(const float a)
 {
     return _nn128_castn128_ps(neon_dupqrf32(a));
@@ -206,9 +225,15 @@ __m128 _mm_set1_ps(const float a)
 }
 
 __forceinline
-__m128d _mm_set1_pd(double _D0)
+__n128d _nn_set1_pd(const double a)
 {
-    return _mm_set_pd(_D0, _D0);
+    return neon_dupqrf64(a);
+}
+
+__forceinline
+__m128d _mm_set1_pd(double a)
+{
+    return _mm_set_pd(a, a);
 }
 
 #define _mm_set_ps1 _mm_set1_ps
@@ -228,8 +253,10 @@ typedef enum  INTRIN_FLAGS
 } INTRIN_FLAGS;
 
 __forceinline
-__n128 _nn_postprocess(__n128 T, __n128 a, const __n128 b, int flags)
+__n128 _nn_postprocess(__n128 T, __n128 a, const __n128 b_unused, int flags)
 {
+    b_unused;
+
     if (flags & _IF_SQRT_F32)
     {
         // Native ARM64 normally returns sign bit=0 for all inputs.  On x86/x64,
@@ -462,7 +489,7 @@ __n128 _nn_sqrt_sd(__n128 a, __n128 b) // not like the others!
     // SQRT(b) gets merged in to lower lane of a
 
     __n128 T = neon_fsqrtq64(b);
-    T = _nn_postprocess(T, b, b, _IF_SQRT_F64); \
+    T = _nn_postprocess(T, b, a /* unused */, _IF_SQRT_F64 | _IF_SCALAR_INSERT_F64); \
 
     return T;
 }
@@ -473,7 +500,7 @@ __n128 _nn_sqrt_ss(__n128 a)
     // SQRT(a) gets merged in to lower lane of a
 
     __n128 T = neon_fsqrtq32(a);
-    T = _nn_postprocess(T, a, a, _IF_SQRT_F32); \
+    T = _nn_postprocess(T, a, a, _IF_SQRT_F32 | _IF_SCALAR_INSERT_F32); \
 
     return T;
 }
@@ -682,6 +709,10 @@ int _mm_movemask_ps(__m128 a)
 // naming conventions as documented at https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html
 //
 
+typedef __n128x2 __n256;  // twin of __m256
+typedef __n128x2 __n256d; // twin of __m256d
+typedef __n128x2 __n256i; // twin of __m256i
+
 //                    conversion-func         type_out  type_in
 
 SIMD_REINTERPRET_CAST(_mm256_castsi256_pd,    __m256d,  __m256i)
@@ -689,6 +720,8 @@ SIMD_REINTERPRET_CAST(_mm256_castsi256_ps,    __m256,   __m256i)
 SIMD_REINTERPRET_CAST(_mm256_castpd_si256,    __m256i,  __m256d)
 SIMD_REINTERPRET_CAST(_mm256_castps_si256,    __m256i,  __m256)
 
+SIMD_REINTERPRET_CAST(_mm256_castpd128_pd256, __m256d,  __m128d)
+SIMD_REINTERPRET_CAST(_mm256_castps128_ps256, __m256,   __m128)
 SIMD_REINTERPRET_CAST(_mm256_castpd256_pd128, __m128d,  __m256d)
 SIMD_REINTERPRET_CAST(_mm256_castps256_ps128, __m128,   __m256)
 
@@ -699,6 +732,18 @@ SIMD_REINTERPRET_CAST(_nn256_castn256_si256,  __m256i,  __n128x2)
 SIMD_REINTERPRET_CAST(_nn256_castpd_n256,     __n128x2, __m256d)
 SIMD_REINTERPRET_CAST(_nn256_castps_n256,     __n128x2, __m256)
 SIMD_REINTERPRET_CAST(_nn256_castsi256_n256,  __n128x2, __m256i)
+
+// initialization and broadcasts
+
+__forceinline void _mm256_zeroall(void)
+{
+    // avoiding mode transitions is a no-op for us
+}
+
+__forceinline void _mm256_zeroupper(void)
+{
+    // avoiding mode transitions is a no-op for us
+}
 
 __forceinline
 __m256d _mm256_set_pd(double _D3, double _D2, double _D1, double _D0)
@@ -752,6 +797,97 @@ __forceinline
 __m256 _mm256_set1_ps(float _F0)
 {
     return _mm256_set_ps(_F0, _F0, _F0, _F0, _F0, _F0, _F0, _F0);
+}
+
+__forceinline
+__m256d _mm256_broadcast_pd(__m128d const * pa)
+{
+    __m256d T;
+
+    T.m256d_f64[0] = pa[0].m128d_f64[0];
+    T.m256d_f64[1] = pa[0].m128d_f64[1];
+    T.m256d_f64[2] = pa[1].m128d_f64[0];
+    T.m256d_f64[3] = pa[1].m128d_f64[1];
+
+    return T;
+}
+
+// VMOVUPS VMOVUPD VMOVDQA
+
+__n256d _nn256_loadu_pd(double const  * pa)
+{
+    __n256d T = vld2q_f64(pa);
+
+    return T;
+}
+
+__forceinline
+__m256d _mm256_loadu_pd(double const  * pa)
+{
+    __m256d T;
+
+    T.m256d_f64[0] = pa[0];
+    T.m256d_f64[1] = pa[1];
+    T.m256d_f64[2] = pa[2];
+    T.m256d_f64[3] = pa[3];
+
+    return T;
+}
+
+__n256 _nn256_loadu_ps(float const  * pa)
+{
+    __n256 T = vld2q_f32(pa);
+
+    return T;
+}
+
+__forceinline
+__m256 _mm256_loadu_ps(float const  * pa)
+{
+    __m256 T;
+
+    T.m256_f32[0] = pa[0];
+    T.m256_f32[1] = pa[1];
+    T.m256_f32[2] = pa[2];
+    T.m256_f32[3] = pa[3];
+    T.m256_f32[4] = pa[4];
+    T.m256_f32[5] = pa[5];
+    T.m256_f32[6] = pa[6];
+    T.m256_f32[7] = pa[7];
+
+    return T;
+}
+
+void _nn256_storeu_pd(double * pa, __n256 a)
+{
+    vst2q_f64(pa, a);
+}
+
+__forceinline
+void _mm256_storeu_pd(double * pa, __m256d a)
+{
+    pa[0] = a.m256d_f64[0];
+    pa[1] = a.m256d_f64[1];
+    pa[2] = a.m256d_f64[2];
+    pa[3] = a.m256d_f64[3];
+}
+
+void _nn256_storeu_ps(float * pa, __n256 a)
+{
+    vst2q_f32(pa, a);
+}
+
+__forceinline
+void _mm256_storeu_ps(float * pa, __m256 a)
+{
+    pa[0] = a.m256_f32[0];
+    pa[1] = a.m256_f32[1];
+    pa[2] = a.m256_f32[2];
+    pa[3] = a.m256_f32[3];
+    pa[4] = a.m256_f32[4];
+    pa[5] = a.m256_f32[5];
+    pa[6] = a.m256_f32[6];
+    pa[7] = a.m256_f32[7];
 }
 
 #define DEFINE_N256_OP_N256_N256(rettype, name, intrin, arg1type, arg1, arg2type, arg2, flags ) \
@@ -814,6 +950,21 @@ DEFINE_N256_OP_N256_N256(__m256d, max_pd,       neon_fmaxq64,   __m256d, a, __m2
 DEFINE_N256_OP_N256_N256(__m256 , min_ps,       neon_fminq32,   __m256 , a, __m256 , b, 0)
 DEFINE_N256_OP_N256_N256(__m256 , max_ps,       neon_fmaxq32,   __m256 , a, __m256 , b, 0)
 
+// VHADDPD
+
+__forceinline
+__m256d _mm256_hadd_pd(__m256d a, __m256d b)
+{
+    __m256d T;
+
+    T.m256d_f64[0] = a.m256d_f64[1] + a.m256d_f64[0];
+    T.m256d_f64[1] = b.m256d_f64[1] + b.m256d_f64[0];
+    T.m256d_f64[2] = a.m256d_f64[3] + a.m256d_f64[2];
+    T.m256d_f64[3] = b.m256d_f64[3] + b.m256d_f64[2];
+
+    return T;
+}
+
 // VSQRTPD VSQRTPS
 
 __forceinline
@@ -872,6 +1023,37 @@ __m128 _mm256_extractf128_ps(__m256 a, const int imm8)
     return T;
 }
 
+// VPERF2F128
+
+__forceinline
+__n256i _nn256_permute2f128_si256 (__n256i a, __n256i b, const int imm8)
+{
+    __n256i T;
+
+    T.val[0] = (imm8 & 0x08) ? _nn_set1_ps(0.0f) : ((imm8 & 02) ? b.val[(imm8 & 0x01) >> 0] : a.val[(imm8 & 0x01) >> 0]);
+    T.val[1] = (imm8 & 0x80) ? _nn_set1_ps(0.0f) : ((imm8 & 20) ? b.val[(imm8 & 0x10) >> 4] : a.val[(imm8 & 0x10) >> 4]);
+
+    return T;
+}
+
+__forceinline
+__m256i _mm256_permute2f128_si256 (__m256i a, __m256i b, const int imm8)
+{
+    return _nn256_castn256_si256( _nn256_permute2f128_si256(_nn256_castsi256_n256(a), _nn256_castsi256_n256(b), imm8) );
+}
+
+__forceinline
+__m256d _mm256_permute2f128_pd (__m256d a, __m256d b, const int imm8)
+{
+    return _nn256_castn256_pd( _nn256_permute2f128_si256(_nn256_castpd_n256(a), _nn256_castpd_n256(b), imm8) );
+}
+
+__forceinline
+__m256 _mm256_permute2f128_ps (__m256 a, __m256 b, const int imm8)
+{
+    return _nn256_castn256_ps( _nn256_permute2f128_si256(_nn256_castps_n256(a), _nn256_castps_n256(b), imm8) );
+}
+
 // VPERMILPD VPERMILPS
 
 __forceinline
@@ -919,6 +1101,96 @@ __m256 _mm256_movehdup_ps(__m256 a)
 {
     return _mm256_permute_ps(a, 0xF5); // F5 = 11'11'01'01
 }
+
+// VCVT variants
+
+__n128x2 _nn256_sw_cvtepi32_pd(__n128i a)
+{
+    __n128x2 T;
+
+    T.val[0].n128_f64[0] = a.n128_u32[0];
+    T.val[0].n128_f64[1] = a.n128_u32[1];
+    T.val[1].n128_f64[0] = a.n128_u32[2];
+    T.val[1].n128_f64[1] = a.n128_u32[3];
+
+    return T;
+}
+
+#if 0
+__n128x2 _nn256_cvtepi32_pd(__n128i a)
+{
+    __n128x2 T;
+
+    T.val[0] = vcvt_f64_s32(a.DUMMYNEONSTRUCT.low64);
+    T.val[1] = vcvt_high_f64_s32(a);
+
+    return T;
+}
+#endif
+
+__forceinline
+__m256d _mm256_cvtepi32_pd(__m128i a)
+{
+    return _nn256_castn256_pd( _nn256_sw_cvtepi32_pd(_nn128_castsi128_n128(a)) );
+}
+
+
+__n128x2 _nn256_sw_cvtps_pd(__n128 a)
+{
+    __n128x2 T;
+
+    T.val[0].n128_f64[0] = a.n128_f32[0];
+    T.val[0].n128_f64[1] = a.n128_f32[1];
+    T.val[1].n128_f64[0] = a.n128_f32[2];
+    T.val[1].n128_f64[1] = a.n128_f32[3];
+
+    return T;
+}
+
+__n128x2 _nn256_cvtps_pd(__n128 a)
+{
+    __n128x2 T;
+
+    T.val[0] = vcvt_f64_f32(a.DUMMYNEONSTRUCT.low64);
+    T.val[1] = vcvt_high_f64_f32(a);
+
+    return T;
+}
+
+__forceinline
+__m256d _mm256_cvtps_pd(__m128 a)
+{
+    return _nn256_castn256_pd( _nn256_cvtps_pd(_nn128_castps_n128(a)) );
+}
+
+
+__n128 _nn256_sw_cvtpd_ps(__n128x2 a)
+{
+    __n128 T;
+
+    T.n128_f32[0] = (float)a.val[0].n128_f64[0];
+    T.n128_f32[1] = (float)a.val[0].n128_f64[1];
+    T.n128_f32[2] = (float)a.val[1].n128_f64[0];
+    T.n128_f32[3] = (float)a.val[1].n128_f64[1];
+
+    return T;
+}
+
+__n128 _nn256_cvtpd_ps(__n256 a)
+{
+    __n128 T = vcvt_high_f32_f64(vcvt_f32_f64(a.val[0]), a.val[1]);
+
+    return T;
+}
+
+__forceinline
+__m128 _mm256_cvtpd_ps(__m256d a)
+{
+    return _nn128_castn128_ps( _nn256_cvtpd_ps(_nn256_castpd_n256(a)) );
+}
+
+
+#pragma strict_gs_check(pop)
 
 #endif  // ARM64/ARM64EC
 

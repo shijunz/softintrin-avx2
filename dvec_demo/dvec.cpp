@@ -76,6 +76,9 @@ int __vectorcall TestDvec()
     d256_f32("W1 ldup", _mm256_moveldup_ps(W1));
     d128_f32("W1 extr", _mm256_extractf128_ps(W1, 0));
     d128_f32("W1 extr", _mm256_extractf128_ps(W1, 1));
+    d128_f32("W1 sqss", _mm_sqrt_ss(_mm256_extractf128_ps(W1, 0)));
+    d128_f32("W2 sqss", _mm_sqrt_ss(_mm256_extractf128_ps(W2, 0)));
+    d256_f64("W1 pspd", _mm256_cvtps_pd(_mm256_extractf128_ps(W1, 0)));
 
     F64vec4 W3(0.0, -1.12345678, 2.23456789, -3.34567891);
     F64vec4 W4(9.87654321);
@@ -99,6 +102,10 @@ int __vectorcall TestDvec()
     d256_f64("W3+perm", _mm256_add_pd(W3, _mm256_permute_pd(W3, 0x05)));
     d128_f64("W3 extr", _mm256_extractf128_pd(W3, 0));
     d128_f64("W3 extr", _mm256_extractf128_pd(W3, 1));
+    d128_f64("W3 sqsd", _mm_sqrt_sd(_mm256_extractf128_pd(W3, 0), _mm256_extractf128_pd(W3, 0)));
+    d128_f64("W4 sqsd", _mm_sqrt_sd(_mm256_extractf128_pd(W4, 0), _mm256_extractf128_pd(W4, 0)));
+    d256_f64("W3 hadd", _mm256_hadd_pd(W3, W3));
+    d128_f32("W3 pdps", _mm256_cvtpd_ps(W3));
 
     F64vec2 V(1.1, 2.2);
     d128_f64("V.2d   ", V);

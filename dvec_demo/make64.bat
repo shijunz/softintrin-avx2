@@ -47,6 +47,7 @@ set CL_ARGS=-W4 -Zi -FAsc -O2 -Oy- -MT -I..
     )
 
 cl -c %CL_ARGS% test.c
+cl -c %CL_ARGS% test2.c
 cl -c %CL_ARGS% dvec.cpp
 
 @rem maximum debug information, remove dead code

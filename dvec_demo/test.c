@@ -13,6 +13,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#include <intrin.h>     // intentional redundant include
+#include <windows.h>    // intentional redundant include
+
 #include "debug_vec.h"
 
 static __m256  f, g;

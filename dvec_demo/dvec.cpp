@@ -21,6 +21,9 @@
 #include <stdio.h>
 #include <ostream>
 
+#include <windows.h>    // intentional redundant include
+#include <intrin.h>     // intentional redundant include
+
 //
 // then include the new softintrins, this will append to the softintrin.h already included
 // but added here for clarity.

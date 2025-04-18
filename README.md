@@ -70,6 +70,8 @@ There are subdirectories in this project (m256_demo, dvec_demo) which demonstrat
 
   - MAKE64.BAT in the dvec_demo directory builds a runnable demo of the 256-bit C++ vector classes provided by `dvec.h` which can now run as native ARM64 and ARM64EC as well as legacy x86 and x64 builds.
 
+  - MAKE64.BAT in the divss_demo directory builds a runnable unit test of SSE2 and AVX2 divisor intrinsics tests as native x64 binaries, stock SDK soft intrinsics binaries, or new soft intrinsics binaries.  You will see as you compare the outputs of each that soft intrinsics more correctly model the x86/x64 behaviour of real AMD and Intel hardware compared to various emulators.
+
 
 ## Implementation notes:
 

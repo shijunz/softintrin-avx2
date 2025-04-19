@@ -13,7 +13,7 @@
 @rem maximum warnings, debug symbols, compile for size, generate listings.
 @rem for better debugging emit frame pointers and spill homeparams.
 @rem link against the static C runtime library for better backward compat.
-@rem x64 builds will default to SSE2 unless -arch:aVX2 is passed as an argument.
+@rem x64 builds will default to SSE2 unless -arch:AVX2 is passed as an argument.
 @rem ARM64 pure native build is the default unless -arm64EC is passed as an argument.
 set CL_ARGS=-W4 -Zi -FAsc -O2 -Oy- -MT -I.. -std:c++20 %1 %2 %3 %4
 

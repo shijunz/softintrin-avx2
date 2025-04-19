@@ -8,6 +8,8 @@
 
 #include <stdio.h>
 
+#if defined(__AVX2__) || (defined(USE_SOFT_INTRINSICS) && (USE_SOFT_INTRINSICS >= 2))
+
 static inline __forceinline
 void d256_u32(const char *psz, __m256i T)
 {
@@ -31,6 +33,8 @@ void d256_f64(const char *psz, __m256d T)
 {
     printf("%-8s %29g %29g %29g %29g\n", psz, T.m256d_f64[3], T.m256d_f64[2], T.m256d_f64[1], T.m256d_f64[0]);
 }
+
+#endif // AVX2
 
 static inline __forceinline
 void d128_f32(const char *psz, __m128 T)

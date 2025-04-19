@@ -254,13 +254,13 @@ typedef enum  INTRIN_FLAGS
     _IF_SCALAR_INSERT_F64 = (1 << 3),
     _IF_DIV_F32 = (1 << 4),
     _IF_DIV_F64 = (1 << 5),
+    _IF_MINMAX_F32 = (1 << 6),
+    _IF_MINMAX_F64 = (1 << 7),
 } INTRIN_FLAGS;
 
 __forceinline
-__n128 _nn_postprocess(__n128 T, __n128 a, const __n128 b_unused, int flags)
+__n128 _nn_postprocess(__n128 T, __n128 a, const __n128 b, int flags)
 {
-    b_unused;
-
     if (flags & _IF_SQRT_F32)
     {
         // Native ARM64 normally returns sign bit=0 for all inputs.  On x86/x64,
@@ -285,27 +285,55 @@ __n128 _nn_postprocess(__n128 T, __n128 a, const __n128 b_unused, int flags)
 
     if (flags & _IF_DIV_F32)
     {
-        // REVIEW: Prism currently does not corrently return -nan(ind)
+        // REVIEW: Prism currently does not correctly return -nan(ind)
         // this code adjusts the result to the correct x86/x64 result
         // using a similar sign propagation trick as SQRT_F32 above.
 
         const __n128 SignMask = neon_dupqr32(0x80000000);
         const __n128 LowxMask = neon_dupqr32(0x00400000);
         const __n128 Incremented = neon_addq64(T, LowxMask);
-        T = neon_bitq(T, Incremented, SignMask);
+        const __n128 MaskedSigns = neon_andq(Incremented, SignMask);
+        T = neon_orrq(T, MaskedSigns);
     }
 
     if (flags & _IF_DIV_F64)
     {
-        // REVIEW: Prism currently does not corrently return -nan(ind)
+        // REVIEW: Prism currently does not correctly return -nan(ind)
         // this code adjusts the result to the correct x86/x64 result
         // using a similar sign propagation trick as SQRT_F64 above.
 
         const __n128 SignMask = neon_dupqr64(0x8000000000000000ull);
         const __n128 LowxMask = neon_dupqr64(0x0008000000000000ull);
         const __n128 Incremented = neon_addq64(T, LowxMask);
-        T = neon_bitq(T, Incremented, SignMask);
+        const __n128 MaskedSigns = neon_andq(Incremented, SignMask);
+        T = neon_orrq(T, MaskedSigns);
     }
+
+    if (flags & _IF_MINMAX_F32)
+    {
+        // this code adjusts the result to the correct x86/x64 result
+        // by selecting second source when either input is NaN
+        // (which is true when neither a>b nor a<b)
+
+        const __n128 GT = vcgtq_f32(a, b);
+        const __n128 LT = vcgtq_f32(b, a);
+        const __n128 IsOrdered = neon_orrq(GT, LT);
+        T = vbslq_f32(IsOrdered, T, b);
+    }
+
+    if (flags & _IF_MINMAX_F64)
+    {
+        // this code adjusts the result to the correct x86/x64 result
+        // by selecting second source when either input is NaN
+        // (which is true when neither a>b nor a<b)
+
+        const __n128 GT = vcgtq_f64(a, b);
+        const __n128 LT = vcgtq_f64(b, a);
+        const __n128 IsOrdered = neon_orrq(GT, LT);
+        T = vbslq_f64(IsOrdered, T, b);
+    }
+
+    // check these two last to insert any adjusted scalar result
 
     if (flags & _IF_SCALAR_INSERT_F32)
     {
@@ -398,8 +426,6 @@ DEFINE_N128_OP_N128_N128(__m128i, andnot_si128, neon_bicq,      __m128i, b, __m1
 DEFINE_N128_OP_N128_N128(__m128i,  or_si128,    neon_orrq,      __m128i, a, __m128i, b, 0)
 DEFINE_N128_OP_N128_N128(__m128i, xor_si128,    neon_eorq,      __m128i, a, __m128i, b, 0)
 
-#if 0
-
 // MINPD MAXPD
 // MINPS MAXPS
 
@@ -408,10 +434,10 @@ DEFINE_N128_OP_N128_N128(__m128i, xor_si128,    neon_eorq,      __m128i, a, __m1
 #undef _mm_min_ps
 #undef _mm_max_ps
 
-DEFINE_N128_OP_N128_N128(__m128d, min_pd,       neon_fminq64,   __m128d, a, __m128d, b, 0)
-DEFINE_N128_OP_N128_N128(__m128d, max_pd,       neon_fmaxq64,   __m128d, a, __m128d, b, 0)
-DEFINE_N128_OP_N128_N128(__m128 , min_ps,       neon_fminq32,   __m128 , a, __m128 , b, 0)
-DEFINE_N128_OP_N128_N128(__m128 , max_ps,       neon_fmaxq32,   __m128 , a, __m128 , b, 0)
+DEFINE_N128_OP_N128_N128(__m128d, min_pd,       vminq_f64,      __m128d, a, __m128d, b, _IF_MINMAX_F64)
+DEFINE_N128_OP_N128_N128(__m128d, max_pd,       vmaxq_f64,      __m128d, a, __m128d, b, _IF_MINMAX_F64)
+DEFINE_N128_OP_N128_N128(__m128 , min_ps,       vminq_f32,      __m128 , a, __m128 , b, _IF_MINMAX_F32)
+DEFINE_N128_OP_N128_N128(__m128 , max_ps,       vmaxq_f32,      __m128 , a, __m128 , b, _IF_MINMAX_F32)
 
 // MINSD MAXSD
 // MINSS MAXSS
@@ -421,12 +447,10 @@ DEFINE_N128_OP_N128_N128(__m128 , max_ps,       neon_fmaxq32,   __m128 , a, __m1
 #undef _mm_min_ss
 #undef _mm_max_ss
 
-DEFINE_N128_OP_N128_N128(__m128d, min_sd,       neon_fminq64,   __m128d, a, __m128d, b, _IF_SCALAR_INSERT_F64)
-DEFINE_N128_OP_N128_N128(__m128d, max_sd,       neon_fmaxq64,   __m128d, a, __m128d, b, _IF_SCALAR_INSERT_F64)
-DEFINE_N128_OP_N128_N128(__m128 , min_ss,       neon_fminq32,   __m128 , a, __m128 , b, _IF_SCALAR_INSERT_F32)
-DEFINE_N128_OP_N128_N128(__m128 , max_ss,       neon_fmaxq32,   __m128 , a, __m128 , b, _IF_SCALAR_INSERT_F32)
-
-#endif
+DEFINE_N128_OP_N128_N128(__m128d, min_sd,       vminq_f64,      __m128d, a, __m128d, b, _IF_SCALAR_INSERT_F64 | _IF_MINMAX_F64)
+DEFINE_N128_OP_N128_N128(__m128d, max_sd,       vmaxq_f64,      __m128d, a, __m128d, b, _IF_SCALAR_INSERT_F64 | _IF_MINMAX_F64)
+DEFINE_N128_OP_N128_N128(__m128 , min_ss,       vminq_f32,      __m128 , a, __m128 , b, _IF_SCALAR_INSERT_F32 | _IF_MINMAX_F32)
+DEFINE_N128_OP_N128_N128(__m128 , max_ss,       vmaxq_f32,      __m128 , a, __m128 , b, _IF_SCALAR_INSERT_F32 | _IF_MINMAX_F32)
 
 // ADDPD SUBPD MULPD DIVPD
 
@@ -476,6 +500,13 @@ DEFINE_N128_OP_N128_N128(__m128 , sub_ss,       neon_fsubq32,   __m128 , a, __m1
 DEFINE_N128_OP_N128_N128(__m128 , mul_ss,       neon_fmulq32,   __m128 , a, __m128 , b, _IF_SCALAR_INSERT_F32)
 DEFINE_N128_OP_N128_N128(__m128 , div_ss,       neon_fdivq32,   __m128 , a, __m128 , b, _IF_SCALAR_INSERT_F32 | _IF_DIV_F32)
 
+// HADDPD HADDPS
+
+#undef _mm_hadd_pd
+#undef _mm_hadd_ps
+
+DEFINE_N128_OP_N128_N128(__m128d, hadd_pd,      vpaddq_f64,     __m128d, a, __m128d, b, 0);
+DEFINE_N128_OP_N128_N128(__m128 , hadd_ps,      vpaddq_f32,     __m128 , a, __m128 , b, 0);
 
 // SQRTPD SQRTSD
 // SQRTPS SQRTSS
@@ -1018,7 +1049,7 @@ DEFINE_N256_OP_N256_N256(__m256d, max_pd,       neon_fmaxq64,   __m256d, a, __m2
 DEFINE_N256_OP_N256_N256(__m256 , min_ps,       neon_fminq32,   __m256 , a, __m256 , b, 0)
 DEFINE_N256_OP_N256_N256(__m256 , max_ps,       neon_fmaxq32,   __m256 , a, __m256 , b, 0)
 
-// VHADDPD
+// VHADDPD VHADDPS
 
 __forceinline
 __m256d _mm256_hadd_pd(__m256d a, __m256d b)
@@ -1029,6 +1060,23 @@ __m256d _mm256_hadd_pd(__m256d a, __m256d b)
     T.m256d_f64[1] = b.m256d_f64[1] + b.m256d_f64[0];
     T.m256d_f64[2] = a.m256d_f64[3] + a.m256d_f64[2];
     T.m256d_f64[3] = b.m256d_f64[3] + b.m256d_f64[2];
+
+    return T;
+}
+
+__forceinline
+__m256 _mm256_hadd_ps(__m256 a, __m256 b)
+{
+    __m256 T;
+
+    T.m256_f32[0] = a.m256_f32[1] + a.m256_f32[0];
+    T.m256_f32[1] = a.m256_f32[3] + a.m256_f32[2];
+    T.m256_f32[2] = b.m256_f32[1] + b.m256_f32[0];
+    T.m256_f32[3] = b.m256_f32[3] + b.m256_f32[2];
+    T.m256_f32[4] = a.m256_f32[5] + a.m256_f32[4];
+    T.m256_f32[5] = a.m256_f32[7] + a.m256_f32[6];
+    T.m256_f32[6] = b.m256_f32[5] + b.m256_f32[4];
+    T.m256_f32[7] = b.m256_f32[7] + b.m256_f32[6];
 
     return T;
 }
@@ -1202,6 +1250,29 @@ __forceinline
 __m256d _mm256_cvtepi32_pd(__m128i a)
 {
     return _nn256_castn256_pd( _nn256_sw_cvtepi32_pd(_nn128_castsi128_n128(a)) );
+}
+
+__forceinline
+__n256 _nn256_sw_cvtepi32_ps(__n256i a)
+{
+    __n256 T;
+
+    T.val[0].n128_f32[0] = (float)a.val[0].n128_u32[0];
+    T.val[0].n128_f32[1] = (float)a.val[0].n128_u32[1];
+    T.val[0].n128_f32[2] = (float)a.val[0].n128_u32[2];
+    T.val[0].n128_f32[3] = (float)a.val[0].n128_u32[3];
+    T.val[1].n128_f32[0] = (float)a.val[1].n128_u32[0];
+    T.val[1].n128_f32[1] = (float)a.val[1].n128_u32[1];
+    T.val[1].n128_f32[2] = (float)a.val[1].n128_u32[2];
+    T.val[1].n128_f32[3] = (float)a.val[1].n128_u32[3];
+
+    return T;
+}
+
+__forceinline
+__m256 _mm256_cvtepi32_ps(__m256i a)
+{
+    return _nn256_castn256_ps( _nn256_sw_cvtepi32_ps(_nn256_castsi256_n256(a)) );
 }
 
 

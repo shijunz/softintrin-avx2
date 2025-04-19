@@ -39,11 +39,11 @@
 set CL_ARGS=-W4 -Zi -FAsc -O2 -Oy- -MT -I..
 
 @if "%VSCMD_ARG_TGT_ARCH%" == "x64" (
-    set CL_ARGS=%CL_ARGS% -homeparams
+    set CL_ARGS=%CL_ARGS% -homeparams -arch:AVX2 %1 %2 %4 %5
     )
 
 @if "%VSCMD_ARG_TGT_ARCH%" == "arm64" (
-    set CL_ARGS=%CL_ARGS% -arch:armv8.2 -feature:rcpc -volatile:ms %1
+    set CL_ARGS=%CL_ARGS% -arch:armv8.2 -feature:rcpc -volatile:ms %1 %2 %3 %4 %5
     )
 
 cl -c %CL_ARGS% test.c

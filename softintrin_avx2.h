@@ -353,6 +353,24 @@ __n128 _nn_postprocess(__n128 T, __n128 a, const __n128 b, int flags)
 }
 
 //
+// Template for common 128-bit dest,source1 unary vector instructions
+//
+
+#define DEFINE_N128_OP_N128(rettype, name, intrin, arg1type, arg1, flags ) \
+\
+__forceinline __n128 _nn_ ## name (const __n128 a) \
+{ \
+    __n128 T = intrin (a); \
+    T = _nn_postprocess(T, a, a, flags); \
+    return T; \
+} \
+\
+__forceinline rettype _mm_ ## name (arg1type arg1) \
+{ \
+    return rettype ## _from___n128 ( _nn_ ## name ( __n128_from_ ## arg1type (a) ) ); \
+}
+
+//
 // Template for common 128-bit dest,source1,source2 vector instructions
 //
 
@@ -370,7 +388,25 @@ __forceinline rettype _mm_ ## name (arg1type arg1, arg2type arg2) \
     return rettype ## _from___n128 ( _nn_ ## name ( __n128_from_ ## arg1type (a), __n128_from_ ## arg2type (b) ) ); \
 }
 
-// PADD PSUB PMUL PDIV
+// PABS
+
+#undef _mm_abs_epi8
+#undef _mm_abs_epi16
+#undef _mm_abs_epi32
+
+DEFINE_N128_OP_N128(     __m128i, abs_epi8,     vabsq_s8,       __m128i, a,             0)
+DEFINE_N128_OP_N128(     __m128i, abs_epi16,    vabsq_s16,      __m128i, a,             0)
+DEFINE_N128_OP_N128(     __m128i, abs_epi32,    vabsq_s32,      __m128i, a,             0)
+
+// PAVG
+
+#undef _mm_avg_epu8
+#undef _mm_avg_epu16
+
+DEFINE_N128_OP_N128_N128(__m128i, avg_epu8,     vrhaddq_u8,     __m128i, a, __m128i, b, 0)
+DEFINE_N128_OP_N128_N128(__m128i, avg_epu16,    vrhaddq_u16,    __m128i, a, __m128i, b, 0)
+
+// PADD PSUB
 
 #undef _mm_add_epi8
 #undef _mm_add_epi16
@@ -392,27 +428,59 @@ DEFINE_N128_OP_N128_N128(__m128i, sub_epi16,    neon_subq16,    __m128i, a, __m1
 DEFINE_N128_OP_N128_N128(__m128i, sub_epi32,    neon_subq32,    __m128i, a, __m128i, b, 0)
 DEFINE_N128_OP_N128_N128(__m128i, sub_epi64,    neon_subq64,    __m128i, a, __m128i, b, 0)
 
-// #undef _mm_mul_epi8
-// #undef _mm_mul_epi16
-// #undef _mm_mul_epi32
-// #undef _mm_mul_epi64
+// PMULDQ PMULUDQ
 
-// DEFINE_N128_OP_N128_N128(__m128i, mul_epi8,     neon_mulq8,     __m128i, a, __m128i, b, 0)
-// DEFINE_N128_OP_N128_N128(__m128i, mul_epi16,    neon_mulq16,    __m128i, a, __m128i, b, 0)
-// DEFINE_N128_OP_N128_N128(__m128i, mul_epi32,    neon_mulq32,    __m128i, a, __m128i, b, 0)
-// DEFINE_N128_OP_N128_N128(__m128i, mul_epi64,    neon_mulq64,    __m128i, a, __m128i, b, 0)
+#undef _mm_mul_epi32
+#undef _mm_mul_epu32
 
-#if 0
-#undef _mm_div_epi8
-#undef _mm_div_epi16
-#undef _mm_div_epi32
-#undef _mm_div_epi64
+__forceinline
+__n128 sw_mulq_s32(__n128 a, const __n128 b)
+{
+    __n128 T;
 
-DEFINE_N128_OP_N128_N128(__m128i, div_epi8,     neon_divq8,     __m128i, a, __m128i, b, 0)
-DEFINE_N128_OP_N128_N128(__m128i, div_epi16,    neon_divq16,    __m128i, a, __m128i, b, 0)
-DEFINE_N128_OP_N128_N128(__m128i, div_epi32,    neon_divq32,    __m128i, a, __m128i, b, 0)
-DEFINE_N128_OP_N128_N128(__m128i, div_epi64,    neon_divq64,    __m128i, a, __m128i, b, 0)
-#endif
+    T.n128_u64[0] = (int64_t)(int32_t)a.n128_u32[0] * (int64_t)(int32_t)b.n128_u32[0];
+    T.n128_u64[1] = (int64_t)(int32_t)a.n128_u32[2] * (int64_t)(int32_t)b.n128_u32[2];
+
+    return T;
+}
+
+__forceinline
+__n128 sw_mulq_u32(__n128 a, const __n128 b)
+{
+    __n128 T;
+
+    T.n128_u64[0] = (uint64_t)(uint32_t)a.n128_u32[0] * (uint64_t)(uint32_t)b.n128_u32[0];
+    T.n128_u64[1] = (uint64_t)(uint32_t)a.n128_u32[2] * (uint64_t)(uint32_t)b.n128_u32[2];
+
+    return T;
+}
+
+DEFINE_N128_OP_N128_N128(__m128i, mul_epi32,    sw_mulq_s32,    __m128i, a, __m128i, b, 0)
+DEFINE_N128_OP_N128_N128(__m128i, mul_epu32,    sw_mulq_u32,    __m128i, a, __m128i, b, 0)
+
+// PADDS PADDUS
+
+#undef _mm_adds_epi8
+#undef _mm_adds_epi16
+#undef _mm_adds_epu8
+#undef _mm_adds_epu16
+
+DEFINE_N128_OP_N128_N128(__m128i, adds_epi8,    vqaddq_s8,      __m128i, a, __m128i, b, 0)
+DEFINE_N128_OP_N128_N128(__m128i, adds_epi16,   vqaddq_s16,     __m128i, a, __m128i, b, 0)
+DEFINE_N128_OP_N128_N128(__m128i, adds_epu8,    vqaddq_u8,      __m128i, a, __m128i, b, 0)
+DEFINE_N128_OP_N128_N128(__m128i, adds_epu16,   vqaddq_u16,     __m128i, a, __m128i, b, 0)
+
+// PSUBS PSUBUS
+
+#undef _mm_subs_epi8
+#undef _mm_subs_epi16
+#undef _mm_subs_epu8
+#undef _mm_subs_epu16
+
+DEFINE_N128_OP_N128_N128(__m128i, subs_epi8,    vqsubq_s8,      __m128i, a, __m128i, b, 0)
+DEFINE_N128_OP_N128_N128(__m128i, subs_epi16,   vqsubq_s16,     __m128i, a, __m128i, b, 0)
+DEFINE_N128_OP_N128_N128(__m128i, subs_epu8,    vqsubq_u8,      __m128i, a, __m128i, b, 0)
+DEFINE_N128_OP_N128_N128(__m128i, subs_epu16,   vqsubq_u16,     __m128i, a, __m128i, b, 0)
 
 // PAND PANDN POR PXOR
 
@@ -426,6 +494,40 @@ DEFINE_N128_OP_N128_N128(__m128i, andnot_si128, neon_bicq,      __m128i, b, __m1
 DEFINE_N128_OP_N128_N128(__m128i,  or_si128,    neon_orrq,      __m128i, a, __m128i, b, 0)
 DEFINE_N128_OP_N128_N128(__m128i, xor_si128,    neon_eorq,      __m128i, a, __m128i, b, 0)
 
+// PMINS PMAXS
+
+#undef _mm_min_epi8
+#undef _mm_min_epi16
+#undef _mm_min_epi32
+#undef _mm_max_epi8
+#undef _mm_max_epi16
+#undef _mm_max_epi32
+
+DEFINE_N128_OP_N128_N128(__m128i, min_epi8,     vminq_s8,       __m128i, a, __m128i, b, 0)
+DEFINE_N128_OP_N128_N128(__m128i, min_epi16,    vminq_s16,      __m128i, a, __m128i, b, 0)
+DEFINE_N128_OP_N128_N128(__m128i, min_epi32,    vminq_s32,      __m128i, a, __m128i, b, 0)
+
+DEFINE_N128_OP_N128_N128(__m128i, max_epi8,     vmaxq_s8,       __m128i, a, __m128i, b, 0)
+DEFINE_N128_OP_N128_N128(__m128i, max_epi16,    vmaxq_s16,      __m128i, a, __m128i, b, 0)
+DEFINE_N128_OP_N128_N128(__m128i, max_epi32,    vmaxq_s32,      __m128i, a, __m128i, b, 0)
+
+// PMINU PMINU
+
+#undef _mm_min_epu8
+#undef _mm_min_epu16
+#undef _mm_min_epu32
+#undef _mm_max_epu8
+#undef _mm_max_epu16
+#undef _mm_max_epu32
+
+DEFINE_N128_OP_N128_N128(__m128i, min_epu8,     vminq_u8,       __m128i, a, __m128i, b, 0)
+DEFINE_N128_OP_N128_N128(__m128i, min_epu16,    vminq_u16,      __m128i, a, __m128i, b, 0)
+DEFINE_N128_OP_N128_N128(__m128i, min_epu32,    vminq_u32,      __m128i, a, __m128i, b, 0)
+
+DEFINE_N128_OP_N128_N128(__m128i, max_epu8,     vmaxq_u8,       __m128i, a, __m128i, b, 0)
+DEFINE_N128_OP_N128_N128(__m128i, max_epu16,    vmaxq_u16,      __m128i, a, __m128i, b, 0)
+DEFINE_N128_OP_N128_N128(__m128i, max_epu32,    vmaxq_u32,      __m128i, a, __m128i, b, 0)
+
 // MINPD MAXPD
 // MINPS MAXPS
 
@@ -436,8 +538,8 @@ DEFINE_N128_OP_N128_N128(__m128i, xor_si128,    neon_eorq,      __m128i, a, __m1
 
 DEFINE_N128_OP_N128_N128(__m128d, min_pd,       vminq_f64,      __m128d, a, __m128d, b, _IF_MINMAX_F64)
 DEFINE_N128_OP_N128_N128(__m128d, max_pd,       vmaxq_f64,      __m128d, a, __m128d, b, _IF_MINMAX_F64)
-DEFINE_N128_OP_N128_N128(__m128 , min_ps,       vminq_f32,      __m128 , a, __m128 , b, _IF_MINMAX_F32)
-DEFINE_N128_OP_N128_N128(__m128 , max_ps,       vmaxq_f32,      __m128 , a, __m128 , b, _IF_MINMAX_F32)
+DEFINE_N128_OP_N128_N128(__m128,  min_ps,       vminq_f32,      __m128,  a, __m128,  b, _IF_MINMAX_F32)
+DEFINE_N128_OP_N128_N128(__m128,  max_ps,       vmaxq_f32,      __m128,  a, __m128,  b, _IF_MINMAX_F32)
 
 // MINSD MAXSD
 // MINSS MAXSS
@@ -449,8 +551,32 @@ DEFINE_N128_OP_N128_N128(__m128 , max_ps,       vmaxq_f32,      __m128 , a, __m1
 
 DEFINE_N128_OP_N128_N128(__m128d, min_sd,       vminq_f64,      __m128d, a, __m128d, b, _IF_SCALAR_INSERT_F64 | _IF_MINMAX_F64)
 DEFINE_N128_OP_N128_N128(__m128d, max_sd,       vmaxq_f64,      __m128d, a, __m128d, b, _IF_SCALAR_INSERT_F64 | _IF_MINMAX_F64)
-DEFINE_N128_OP_N128_N128(__m128 , min_ss,       vminq_f32,      __m128 , a, __m128 , b, _IF_SCALAR_INSERT_F32 | _IF_MINMAX_F32)
-DEFINE_N128_OP_N128_N128(__m128 , max_ss,       vmaxq_f32,      __m128 , a, __m128 , b, _IF_SCALAR_INSERT_F32 | _IF_MINMAX_F32)
+DEFINE_N128_OP_N128_N128(__m128,  min_ss,       vminq_f32,      __m128,  a, __m128,  b, _IF_SCALAR_INSERT_F32 | _IF_MINMAX_F32)
+DEFINE_N128_OP_N128_N128(__m128,  max_ss,       vmaxq_f32,      __m128,  a, __m128,  b, _IF_SCALAR_INSERT_F32 | _IF_MINMAX_F32)
+
+// ANDPD ORPD XORPD
+
+#undef _mm_and_pd
+#undef _mm_andnot_pd
+#undef _mm_or_pd
+#undef _mm_xor_pd
+
+DEFINE_N128_OP_N128_N128(__m128d, and_pd,       vandq_s64,      __m128d, a, __m128d, b, 0)
+DEFINE_N128_OP_N128_N128(__m128d, andnot_pd,    vbicq_s64,      __m128d, b, __m128d, a, 0) // swap arg order
+DEFINE_N128_OP_N128_N128(__m128d, or_pd,        vorrq_s64,      __m128d, a, __m128d, b, 0)
+DEFINE_N128_OP_N128_N128(__m128d, xor_pd,       veorq_s64,      __m128d, a, __m128d, b, 0)
+
+// ANDPS ORPS XORPS
+
+#undef _mm_and_ps
+#undef _mm_andnot_ps
+#undef _mm_or_ps
+#undef _mm_xor_ps
+
+DEFINE_N128_OP_N128_N128(__m128,  and_ps,       vandq_s32,      __m128,  a, __m128,  b, 0)
+DEFINE_N128_OP_N128_N128(__m128,  andnot_ps,    vbicq_s32,      __m128,  b, __m128,  a, 0) // swap arg order
+DEFINE_N128_OP_N128_N128(__m128,  or_ps,        vorrq_s32,      __m128,  a, __m128,  b, 0)
+DEFINE_N128_OP_N128_N128(__m128,  xor_ps,       veorq_s32,      __m128,  a, __m128,  b, 0)
 
 // ADDPD SUBPD MULPD DIVPD
 
@@ -471,10 +597,10 @@ DEFINE_N128_OP_N128_N128(__m128d, div_pd,       neon_fdivq64,   __m128d, a, __m1
 #undef _mm_mul_ps
 #undef _mm_div_ps
 
-DEFINE_N128_OP_N128_N128(__m128 , add_ps,       neon_faddq32,   __m128 , a, __m128 , b, 0)
-DEFINE_N128_OP_N128_N128(__m128 , sub_ps,       neon_fsubq32,   __m128 , a, __m128 , b, 0)
-DEFINE_N128_OP_N128_N128(__m128 , mul_ps,       neon_fmulq32,   __m128 , a, __m128 , b, 0)
-DEFINE_N128_OP_N128_N128(__m128 , div_ps,       neon_fdivq32,   __m128 , a, __m128 , b, _IF_DIV_F32)
+DEFINE_N128_OP_N128_N128(__m128,  add_ps,       neon_faddq32,   __m128,  a, __m128,  b, 0)
+DEFINE_N128_OP_N128_N128(__m128,  sub_ps,       neon_fsubq32,   __m128,  a, __m128,  b, 0)
+DEFINE_N128_OP_N128_N128(__m128,  mul_ps,       neon_fmulq32,   __m128,  a, __m128,  b, 0)
+DEFINE_N128_OP_N128_N128(__m128,  div_ps,       neon_fdivq32,   __m128,  a, __m128,  b, _IF_DIV_F32)
 
 // ADDSD SUBSD MULSD DIVSD
 
@@ -495,10 +621,10 @@ DEFINE_N128_OP_N128_N128(__m128d, div_sd,       neon_fdivq64,   __m128d, a, __m1
 #undef _mm_mul_ss
 #undef _mm_div_ss
 
-DEFINE_N128_OP_N128_N128(__m128 , add_ss,       neon_faddq32,   __m128 , a, __m128 , b, _IF_SCALAR_INSERT_F32)
-DEFINE_N128_OP_N128_N128(__m128 , sub_ss,       neon_fsubq32,   __m128 , a, __m128 , b, _IF_SCALAR_INSERT_F32)
-DEFINE_N128_OP_N128_N128(__m128 , mul_ss,       neon_fmulq32,   __m128 , a, __m128 , b, _IF_SCALAR_INSERT_F32)
-DEFINE_N128_OP_N128_N128(__m128 , div_ss,       neon_fdivq32,   __m128 , a, __m128 , b, _IF_SCALAR_INSERT_F32 | _IF_DIV_F32)
+DEFINE_N128_OP_N128_N128(__m128,  add_ss,       neon_faddq32,   __m128,  a, __m128,  b, _IF_SCALAR_INSERT_F32)
+DEFINE_N128_OP_N128_N128(__m128,  sub_ss,       neon_fsubq32,   __m128,  a, __m128,  b, _IF_SCALAR_INSERT_F32)
+DEFINE_N128_OP_N128_N128(__m128,  mul_ss,       neon_fmulq32,   __m128,  a, __m128,  b, _IF_SCALAR_INSERT_F32)
+DEFINE_N128_OP_N128_N128(__m128,  div_ss,       neon_fdivq32,   __m128,  a, __m128,  b, _IF_SCALAR_INSERT_F32 | _IF_DIV_F32)
 
 // HADDPD HADDPS
 
@@ -506,7 +632,7 @@ DEFINE_N128_OP_N128_N128(__m128 , div_ss,       neon_fdivq32,   __m128 , a, __m1
 #undef _mm_hadd_ps
 
 DEFINE_N128_OP_N128_N128(__m128d, hadd_pd,      vpaddq_f64,     __m128d, a, __m128d, b, 0);
-DEFINE_N128_OP_N128_N128(__m128 , hadd_ps,      vpaddq_f32,     __m128 , a, __m128 , b, 0);
+DEFINE_N128_OP_N128_N128(__m128,  hadd_ps,      vpaddq_f32,     __m128,  a, __m128,  b, 0);
 
 // SQRTPD SQRTSD
 // SQRTPS SQRTSS
@@ -989,6 +1115,31 @@ void _mm256_store_ps(float * pa, __m256 a)
     _mm256_storeu_ps(pa, a);
 }
 
+//
+// Template for common 256-bit dest,source1 unary vector instructions
+//
+
+#define DEFINE_N256_OP_N256(rettype, name, intrin, arg1type, arg1, flags ) \
+\
+__forceinline __n128x2 _nn256_ ## name (const __n128x2 a) \
+{ \
+    __n128x2 T; \
+    T.val[0] = intrin (a.val[0]); \
+    T.val[0] = _nn_postprocess(T.val[0], a.val[0], a.val[0], flags); \
+    T.val[1] = intrin (a.val[1]); \
+    T.val[1] = _nn_postprocess(T.val[1], a.val[1], a.val[1], flags); \
+    return T; \
+} \
+\
+__forceinline rettype _mm256_ ## name (arg1type arg1) \
+{ \
+    return rettype ## _from___n128x2 ( _nn256_ ## name ( __n128x2_from_ ## arg1type (a) ) ); \
+}
+
+//
+// Template for common 256-bit dest,source1,source2 vector instructions
+//
+
 #define DEFINE_N256_OP_N256_N256(rettype, name, intrin, arg1type, arg1, arg2type, arg2, flags ) \
 \
 __forceinline __n128x2 _nn256_ ## name (__n128x2 a, const __n128x2 b) \
@@ -1006,6 +1157,51 @@ __forceinline rettype _mm256_ ## name (arg1type arg1, arg2type arg2) \
     return rettype ## _from___n128x2 ( _nn256_ ## name ( __n128x2_from_ ## arg1type (a), __n128x2_from_ ## arg2type (b) ) ); \
 }
 
+// VPABS
+
+DEFINE_N256_OP_N256(     __m256i, abs_epi8,     vabsq_s8,       __m256i, a,             0)
+DEFINE_N256_OP_N256(     __m256i, abs_epi16,    vabsq_s16,      __m256i, a,             0)
+DEFINE_N256_OP_N256(     __m256i, abs_epi32,    vabsq_s32,      __m256i, a,             0)
+
+// VPAVG
+
+#undef _mm_avg_epu8
+#undef _mm_avg_epu16
+
+DEFINE_N256_OP_N256_N256(__m256i, avg_epu8,     vrhaddq_u8,     __m256i, a, __m256i, b, 0)
+DEFINE_N256_OP_N256_N256(__m256i, avg_epu16,    vrhaddq_u16,    __m256i, a, __m256i, b, 0)
+
+// VPADD VPSUB
+
+DEFINE_N256_OP_N256_N256(__m256i, add_epi8,     neon_addq8,     __m256i, a, __m256i, b, 0)
+DEFINE_N256_OP_N256_N256(__m256i, add_epi16,    neon_addq16,    __m256i, a, __m256i, b, 0)
+DEFINE_N256_OP_N256_N256(__m256i, add_epi32,    neon_addq32,    __m256i, a, __m256i, b, 0)
+DEFINE_N256_OP_N256_N256(__m256i, add_epi64,    neon_addq64,    __m256i, a, __m256i, b, 0)
+
+DEFINE_N256_OP_N256_N256(__m256i, sub_epi8,     neon_subq8,     __m256i, a, __m256i, b, 0)
+DEFINE_N256_OP_N256_N256(__m256i, sub_epi16,    neon_subq16,    __m256i, a, __m256i, b, 0)
+DEFINE_N256_OP_N256_N256(__m256i, sub_epi32,    neon_subq32,    __m256i, a, __m256i, b, 0)
+DEFINE_N256_OP_N256_N256(__m256i, sub_epi64,    neon_subq64,    __m256i, a, __m256i, b, 0)
+
+// PMULDQ PMULUDQ
+
+DEFINE_N256_OP_N256_N256(__m256i, mul_epi32,    sw_mulq_s32,    __m256i, a, __m256i, b, 0)
+DEFINE_N256_OP_N256_N256(__m256i, mul_epu32,    sw_mulq_u32,    __m256i, a, __m256i, b, 0)
+
+// VPADDS VPADDUS
+
+DEFINE_N256_OP_N256_N256(__m256i, adds_epi8,    vqaddq_s8,      __m256i, a, __m256i, b, 0)
+DEFINE_N256_OP_N256_N256(__m256i, adds_epi16,   vqaddq_s16,     __m256i, a, __m256i, b, 0)
+DEFINE_N256_OP_N256_N256(__m256i, adds_epu8,    vqaddq_u8,      __m256i, a, __m256i, b, 0)
+DEFINE_N256_OP_N256_N256(__m256i, adds_epu16,   vqaddq_u16,     __m256i, a, __m256i, b, 0)
+
+// VPSUBS VPSUBUS
+
+DEFINE_N256_OP_N256_N256(__m256i, subs_epi8,    vqsubq_s8,      __m256i, a, __m256i, b, 0)
+DEFINE_N256_OP_N256_N256(__m256i, subs_epi16,   vqsubq_s16,     __m256i, a, __m256i, b, 0)
+DEFINE_N256_OP_N256_N256(__m256i, subs_epu8,    vqsubq_u8,      __m256i, a, __m256i, b, 0)
+DEFINE_N256_OP_N256_N256(__m256i, subs_epu16,   vqsubq_u16,     __m256i, a, __m256i, b, 0)
+
 // VPAND  VPANDN  VPOR  VPXOR
 
 DEFINE_N256_OP_N256_N256(__m256i, and_si256,    neon_andq,      __m256i, a, __m256i, b, 0)
@@ -1013,7 +1209,7 @@ DEFINE_N256_OP_N256_N256(__m256i, andnot_si256, neon_bicq,      __m256i, b, __m2
 DEFINE_N256_OP_N256_N256(__m256i, or_si256,     neon_orrq,      __m256i, a, __m256i, b, 0)
 DEFINE_N256_OP_N256_N256(__m256i, xor_si256,    neon_eorq,      __m256i, a, __m256i, b, 0)
 
-// VANDPP VORPD VXORPD
+// VANDPD VORPD VXORPD
 
 DEFINE_N256_OP_N256_N256(__m256d, and_pd,       vandq_s64,      __m256d, a, __m256d, b, 0)
 DEFINE_N256_OP_N256_N256(__m256d, andnot_pd,    vbicq_s64,      __m256d, b, __m256d, a, 0) // swap arg order
@@ -1022,10 +1218,10 @@ DEFINE_N256_OP_N256_N256(__m256d, xor_pd,       veorq_s64,      __m256d, a, __m2
 
 // VANDPS VORPS VXORPS
 
-DEFINE_N256_OP_N256_N256(__m256 , and_ps,       vandq_s32,      __m256 , a, __m256 , b, 0)
-DEFINE_N256_OP_N256_N256(__m256 , andnot_ps,    vbicq_s32,      __m256 , b, __m256 , a, 0) // swap arg order
-DEFINE_N256_OP_N256_N256(__m256 , or_ps,        vorrq_s32,      __m256 , a, __m256 , b, 0)
-DEFINE_N256_OP_N256_N256(__m256 , xor_ps,       veorq_s32,      __m256 , a, __m256 , b, 0)
+DEFINE_N256_OP_N256_N256(__m256,  and_ps,       vandq_s32,      __m256,  a, __m256,  b, 0)
+DEFINE_N256_OP_N256_N256(__m256,  andnot_ps,    vbicq_s32,      __m256,  b, __m256,  a, 0) // swap arg order
+DEFINE_N256_OP_N256_N256(__m256,  or_ps,        vorrq_s32,      __m256,  a, __m256,  b, 0)
+DEFINE_N256_OP_N256_N256(__m256,  xor_ps,       veorq_s32,      __m256,  a, __m256,  b, 0)
 
 // VADDPD VSUBPD VMULPD VDIVPD
 
@@ -1036,20 +1232,42 @@ DEFINE_N256_OP_N256_N256(__m256d, div_pd,       neon_fdivq64,   __m256d, a, __m2
 
 // VADDPD VSUBPD VMULPD VDIVPD
 
-DEFINE_N256_OP_N256_N256(__m256 , add_ps,       neon_faddq32,   __m256 , a, __m256 , b, 0)
-DEFINE_N256_OP_N256_N256(__m256 , sub_ps,       neon_fsubq32,   __m256 , a, __m256 , b, 0)
-DEFINE_N256_OP_N256_N256(__m256 , mul_ps,       neon_fmulq32,   __m256 , a, __m256 , b, 0)
-DEFINE_N256_OP_N256_N256(__m256 , div_ps,       neon_fdivq32,   __m256 , a, __m256 , b, _IF_DIV_F32)
+DEFINE_N256_OP_N256_N256(__m256,  add_ps,       neon_faddq32,   __m256,  a, __m256,  b, 0)
+DEFINE_N256_OP_N256_N256(__m256,  sub_ps,       neon_fsubq32,   __m256,  a, __m256,  b, 0)
+DEFINE_N256_OP_N256_N256(__m256,  mul_ps,       neon_fmulq32,   __m256,  a, __m256,  b, 0)
+DEFINE_N256_OP_N256_N256(__m256,  div_ps,       neon_fdivq32,   __m256,  a, __m256,  b, _IF_DIV_F32)
+
+// VPMINS VPMAXS
+
+DEFINE_N256_OP_N256_N256(__m256i, min_epi8,     vminq_s8,       __m256i, a, __m256i, b, 0)
+DEFINE_N256_OP_N256_N256(__m256i, min_epi16,    vminq_s16,      __m256i, a, __m256i, b, 0)
+DEFINE_N256_OP_N256_N256(__m256i, min_epi32,    vminq_s32,      __m256i, a, __m256i, b, 0)
+
+DEFINE_N256_OP_N256_N256(__m256i, max_epi8,     vmaxq_s8,       __m256i, a, __m256i, b, 0)
+DEFINE_N256_OP_N256_N256(__m256i, max_epi16,    vmaxq_s16,      __m256i, a, __m256i, b, 0)
+DEFINE_N256_OP_N256_N256(__m256i, max_epi32,    vmaxq_s32,      __m256i, a, __m256i, b, 0)
+
+// VPMINU VPMINU
+
+DEFINE_N256_OP_N256_N256(__m256i, min_epu8,     vminq_u8,       __m256i, a, __m256i, b, 0)
+DEFINE_N256_OP_N256_N256(__m256i, min_epu16,    vminq_u16,      __m256i, a, __m256i, b, 0)
+DEFINE_N256_OP_N256_N256(__m256i, min_epu32,    vminq_u32,      __m256i, a, __m256i, b, 0)
+
+DEFINE_N256_OP_N256_N256(__m256i, max_epu8,     vmaxq_u8,       __m256i, a, __m256i, b, 0)
+DEFINE_N256_OP_N256_N256(__m256i, max_epu16,    vmaxq_u16,      __m256i, a, __m256i, b, 0)
+DEFINE_N256_OP_N256_N256(__m256i, max_epu32,    vmaxq_u32,      __m256i, a, __m256i, b, 0)
 
 // VMIN VMAX
 
-DEFINE_N256_OP_N256_N256(__m256d, min_pd,       neon_fminq64,   __m256d, a, __m256d, b, 0)
-DEFINE_N256_OP_N256_N256(__m256d, max_pd,       neon_fmaxq64,   __m256d, a, __m256d, b, 0)
+DEFINE_N256_OP_N256_N256(__m256d, min_pd,       vminq_f64,      __m256d, a, __m256d, b, _IF_MINMAX_F64)
+DEFINE_N256_OP_N256_N256(__m256d, max_pd,       vmaxq_f64,      __m256d, a, __m256d, b, _IF_MINMAX_F64)
 
-DEFINE_N256_OP_N256_N256(__m256 , min_ps,       neon_fminq32,   __m256 , a, __m256 , b, 0)
-DEFINE_N256_OP_N256_N256(__m256 , max_ps,       neon_fmaxq32,   __m256 , a, __m256 , b, 0)
+DEFINE_N256_OP_N256_N256(__m256,  min_ps,       vminq_f32,      __m256,  a, __m256,  b, _IF_MINMAX_F32)
+DEFINE_N256_OP_N256_N256(__m256,  max_ps,       vmaxq_f32,      __m256,  a, __m256,  b, _IF_MINMAX_F32)
 
 // VHADDPD VHADDPS
+
+#if 0
 
 __forceinline
 __m256d _mm256_hadd_pd(__m256d a, __m256d b)
@@ -1080,6 +1298,13 @@ __m256 _mm256_hadd_ps(__m256 a, __m256 b)
 
     return T;
 }
+
+#else
+
+DEFINE_N256_OP_N256_N256(__m256d, hadd_pd,      vpaddq_f64,     __m256d, a, __m256d, b, 0);
+DEFINE_N256_OP_N256_N256(__m256,  hadd_ps,      vpaddq_f32,     __m256,  a, __m256,  b, 0);
+
+#endif
 
 // VSQRTPD VSQRTPS
 

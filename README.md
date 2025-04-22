@@ -5,9 +5,11 @@ Faster SSE/AVX/AVX2 software intrinsics for use with VS2022 and Windows SDK for 
 
 This project consists of two C/C++ header files which provide enhancements to the existing [ARM64EC](http://www.emulators.com/docs/abc_arm64ec_explained.htm) "soft intrinsics" provided in the Windows 24H2 SDK (build 10.0.26100).  The goal is to provide additional performance and functionality compared to what ships in the Windows SDK.  For Windows developers who are unfamiliar with ARM64 or NEON, to simplify porting existing Windows applications from Intel to ARM64 this project provides:
 
-- hundreds of new 256-bit AVX2 soft intrinsics for ARM64 and ARM64EC not implemented in the Windows SDK
+- over 100 new 256-bit AVX2 soft intrinsics for ARM64 and ARM64EC not implemented in the Windows SDK, more in progress
 
 - optimizations to existing SSE soft intrinsics already in the SDK (for example, over 15x speedup for ToyPathTracer ray tracing demo just by adding and recompiling with these two .H files)
+
+- test suite for over 320 SSE4 and AVX2 intrinsics, more in progress, very useful for validating the performance and correctness not only of these soft intrinsics but for emulators such as Prism, QEMU, and Rosetta
 
 - native ARM64 support for soft intrinsics, including the ability to now use Visual Studio's `dvec.h` 128-bit SSE and 256-bit AVX2 vector classes
 

@@ -18,6 +18,7 @@
 #include <use_soft_intrinsics.h>  // always place first
 #endif
 
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -128,9 +129,16 @@ uint64_t StartTick, StopTick;
 uint64_t BenchmarkMinimum;
 uint64_t Iterations;
 
+char *SearchString;
+
 __declspec(noinline)
-void init_vecs()
+bool init_vecs(char *OpName)
 {
+    // skip this test if there is a search string miss
+
+    if ((SearchString != 0) && (0 == strstr(OpName, SearchString)))
+        return false;
+
     for (unsigned i = 0; i < NUM_BIGVECS; i++)
     {
         // set the corresponding pointer to the output vector
@@ -183,6 +191,8 @@ void init_vecs()
     } while (StartTick == StopTick);
 
     StartTick = StopTick;
+
+    return true;
 }
 
 //
@@ -190,7 +200,7 @@ void init_vecs()
 //
 
 __forceinline
-int Run()
+int Run(void)
 {
     StopTick = GetTickCount64();
     Iterations += NUM_BIGVECS - 2;
@@ -213,8 +223,7 @@ void dump_vecs(char *OpName)
         uint64_t OpsPerSec = Iterations * 1000ull / (StopTick - StartTick);
         double   PsecPerOp = 1000000000000.0  / (OpsPerSec + 1);
 
-     // printf("%-22s: %9llu Mops/second, %9.0f ns/op\n", OpName, OpsPerSec / 1000000ull, PsecPerOp);
-        printf("%-22s: %9.0f ps/op\n", OpName, PsecPerOp);
+        printf("%-25s  %9.0f ps/op\n", OpName, PsecPerOp);
 
         return;
     }
@@ -276,8 +285,8 @@ __forceinline void __cdecl test ## op         (unsigned index) {                
 #undef  DEFINE_TEST_OP_RABI
 #undef  DEFINE_TEST_OP_VAB
 
-#define EXECUTE_TEST_OP(op)         init_vecs(); do { for (unsigned i = 0; i < (NUM_BIGVECS - 2); i++) { test ## op (i);         } } while (Run()); dump_vecs(# op);
-#define EXECUTE_TEST_OP_I(op, imm8) init_vecs(); do { for (unsigned i = 0; i < (NUM_BIGVECS - 2); i++) { test ## op ## imm8 (i); } } while (Run()); dump_vecs(# op);
+#define EXECUTE_TEST_OP(op)         do { if (init_vecs(# op)) { do { for (unsigned i = 0; i < (NUM_BIGVECS - 2); i++) { test ## op (i);         } } while (Run()); dump_vecs(# op); } } while(0);
+#define EXECUTE_TEST_OP_I(op, imm8) do { if (init_vecs(# op)) { do { for (unsigned i = 0; i < (NUM_BIGVECS - 2); i++) { test ## op ## imm8 (i); } } while (Run()); dump_vecs(# op); } } while(0);
 
 #define DEFINE_TEST_OP_R(   op, type_ret)                          EXECUTE_TEST_OP  (op)
 #define DEFINE_TEST_OP_RA(  op, type_ret, type_a)                  EXECUTE_TEST_OP  (op)
@@ -287,7 +296,7 @@ __forceinline void __cdecl test ## op         (unsigned index) {                
 #define DEFINE_TEST_OP_RABI(op, type_ret, type_a, type_b, imm8)    EXECUTE_TEST_OP_I(op, imm8)
 #define DEFINE_TEST_OP_VAB( op,           type_a, type_b)          EXECUTE_TEST_OP  (op)
 
-void RunTests()
+void RunTests(void)
 {
     #include "intrin-list.h"
 }
@@ -311,8 +320,8 @@ int main (int argc, char **argv)
 
               case '?':
 Usage:
-                printf("Usage: %s [-b|-B] [-o output_file]\n", argv[0]);
-                break;
+                printf("Usage: %s [-b|-B] [-f search_string] [-o output_file]\n", argv[0]);
+                return 0;
 
               case 'b':
                 BenchmarkMinimum = 150;  // 150 milliseconds per intrinsic
@@ -320,6 +329,13 @@ Usage:
 
               case 'B':
                 BenchmarkMinimum = 500;  // 500 milliseconds per intrinsic (more precision in the timing)
+                break;
+
+              case 'f':                  // filter by string
+                if (argc <= ++argi)
+                    goto Usage;
+
+                SearchString = argv[argi];
                 break;
 
               case 'o':                  // redirect output to a file, useful for TTD tracing

@@ -671,7 +671,12 @@ DEFINE_N128_OP_N128_N128(__m128i, subs_epu16,   vqsubq_u16,     __m128i, a, __m1
 __forceinline
 __n128 sw_psubq_u16(__n128 a, const __n128 b)
 {
-    __n128 T;
+    __n128i T1 = neon_uzp2_q16(a, b);  // extract odd lanes  15 13 .. 7 5 3 1
+    __n128i T2 = neon_uzp1_q16(a, b);  // extract even lanes 14 12 .. 6 4 2 0
+    __n128i T  = vsubq_s16(T2, T1);    // sub(even,odd)
+
+#if 0
+    // slower reference alternative
 
     T.n128_u16[0] = a.n128_u16[0] - a.n128_u16[1];
     T.n128_u16[1] = a.n128_u16[2] - a.n128_u16[3];
@@ -681,6 +686,7 @@ __n128 sw_psubq_u16(__n128 a, const __n128 b)
     T.n128_u16[5] = b.n128_u16[2] - b.n128_u16[3];
     T.n128_u16[6] = b.n128_u16[4] - b.n128_u16[5];
     T.n128_u16[7] = b.n128_u16[6] - b.n128_u16[7];
+#endif
 
     return T;
 }
@@ -688,12 +694,18 @@ __n128 sw_psubq_u16(__n128 a, const __n128 b)
 __forceinline
 __n128 sw_psubq_u32(__n128 a, const __n128 b)
 {
-    __n128 T;
+    __n128i T1 = neon_uzp2_q32(a, b);  // extract odd lanes
+    __n128i T2 = neon_uzp1_q32(a, b);  // extract even lanes
+    __n128i T  = vsubq_s32(T2, T1);    // sub(even,odd)
+
+#if 0
+    // slower reference alternative
 
     T.n128_u32[0] = a.n128_u32[0] - a.n128_u32[1];
     T.n128_u32[1] = a.n128_u32[2] - a.n128_u32[3];
     T.n128_u32[2] = b.n128_u32[0] - b.n128_u32[1];
     T.n128_u32[3] = b.n128_u32[2] - b.n128_u32[3];
+#endif
 
     return T;
 }
@@ -701,13 +713,19 @@ __n128 sw_psubq_u32(__n128 a, const __n128 b)
 __forceinline
 __n128 sw_hsubs_epi16(__n128 a, const __n128 b)
 {
-    __n128 T;
+    __n128i T1 = neon_uzp2_q16(a, b);  // extract odd lanes  15 13 .. 7 5 3 1
+    __n128i T2 = neon_uzp1_q16(a, b);  // extract even lanes 14 12 .. 6 4 2 0
+    __n128i T  = vqsubq_s16(T2, T1);   // subs(even,odd)
+
+#if 0
+    // slower reference alternative
 
     for (unsigned i = 0; i < 4; i++)
         T.n128_u16[i] = _SaturateI16((__int16)a.n128_u16[i+i] - (__int16)a.n128_u16[i+i+1]);
 
     for (unsigned i = 0; i < 4; i++)
         T.n128_u16[i+4] = _SaturateI16((__int16)b.n128_u16[i+i] - (__int16)b.n128_u16[i+i+1]);
+#endif
 
     return T;
 }
@@ -1522,7 +1540,7 @@ DEFINE_N256_OP_N256_N256(__m256i, adds_epu16,   vqaddq_u16,     __m256i, a, __m2
 
 DEFINE_N256_OP_N256_N256(__m256i, hadd_epi16,   vpaddq_u16,     __m256i, a, __m256i, b, 0)
 DEFINE_N256_OP_N256_N256(__m256i, hadd_epi32,   vpaddq_u32,     __m256i, a, __m256i, b, 0)
-DEFINE_N256_OP_N256_N256(__m256i, hadds_epi16,  vpaddq_s32,     __m256i, a, __m256i, b, 0);
+DEFINE_N256_OP_N256_N256(__m256i, hadds_epi16,  sw_hadds_epi16, __m256i, a, __m256i, b, 0);
 
 // VPSUBS VPSUBUS
 
@@ -1535,7 +1553,7 @@ DEFINE_N256_OP_N256_N256(__m256i, subs_epu16,   vqsubq_u16,     __m256i, a, __m2
 
 DEFINE_N256_OP_N256_N256(__m256i, hsub_epi16,   sw_psubq_u16,   __m256i, a, __m256i, b, 0)
 DEFINE_N256_OP_N256_N256(__m256i, hsub_epi32,   sw_psubq_u32,   __m256i, a, __m256i, b, 0)
-DEFINE_N256_OP_N256_N256(__m256i, hsubs_epi16,  sw_psubq_u16,   __m256i, a, __m256i, b, 0)
+DEFINE_N256_OP_N256_N256(__m256i, hsubs_epi16,  sw_hsubs_epi16, __m256i, a, __m256i, b, 0)
 
 // VPAND  VPANDN  VPOR  VPXOR
 

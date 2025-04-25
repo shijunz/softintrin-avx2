@@ -470,6 +470,12 @@ __n128 _nn_postprocess(__n128 T, __n128 a, const __n128 b, int flags)
     return T;
 }
 
+__forceinline
+__int16 _SaturateI16(__int32 a)
+{
+    return (a < -32768) ? -32768 : (a > 32767) ? 32767 : a;
+}
+
 //
 // Template for common 128-bit dest,source1 unary vector instructions
 //
@@ -574,8 +580,8 @@ __n128 sw_mulq_s32(__n128 a, const __n128 b)
 {
     __n128 T;
 
-    T.n128_u64[0] = (int64_t)(int32_t)a.n128_u32[0] * (int64_t)(int32_t)b.n128_u32[0];
-    T.n128_u64[1] = (int64_t)(int32_t)a.n128_u32[2] * (int64_t)(int32_t)b.n128_u32[2];
+    T.n128_u64[0] = (__int64)(__int32)a.n128_u32[0] * (__int64)(__int32)b.n128_u32[0];
+    T.n128_u64[1] = (__int64)(__int32)a.n128_u32[2] * (__int64)(__int32)b.n128_u32[2];
 
     return T;
 }
@@ -585,8 +591,8 @@ __n128 sw_mulq_u32(__n128 a, const __n128 b)
 {
     __n128 T;
 
-    T.n128_u64[0] = (uint64_t)(uint32_t)a.n128_u32[0] * (uint64_t)(uint32_t)b.n128_u32[0];
-    T.n128_u64[1] = (uint64_t)(uint32_t)a.n128_u32[2] * (uint64_t)(uint32_t)b.n128_u32[2];
+    T.n128_u64[0] = (unsigned __int64)a.n128_u32[0] * (unsigned __int64)b.n128_u32[0];
+    T.n128_u64[1] = (unsigned __int64)a.n128_u32[2] * (unsigned __int64)b.n128_u32[2];
 
     return T;
 }
@@ -620,9 +626,29 @@ DEFINE_N128_OP_N128_N128(__m128i, adds_epu16,   vqaddq_u16,     __m128i, a, __m1
 #undef _mm_hadd_epi32
 #undef _mm_hadds_epi16
 
+__forceinline
+__n128i sw_hadds_epi16(__n128i a, const __n128i b)
+{
+    __n128i T1 = neon_uzp2_q16(a, b);  // extract odd lanes  15 13 .. 7 5 3 1
+    __n128i T2 = neon_uzp1_q16(a, b);  // extract even lanes 14 12 .. 6 4 2 0
+    __n128i T  = vqaddq_s16(T1, T2);   // sum(15,14) sum(13,12) .. sum(1,0)
+
+#if 0
+    // slower reference alternative
+
+    for (unsigned i = 0; i < 4; i++)
+        T.n128_u16[i] = _SaturateI16((__int16)a.n128_u16[i+i] + (__int16)a.n128_u16[i+i+1]);
+
+    for (unsigned i = 0; i < 4; i++)
+        T.n128_u16[i+4] = _SaturateI16((__int16)b.n128_u16[i+i] + (__int16)b.n128_u16[i+i+1]);
+#endif
+
+    return T;
+}
+
 DEFINE_N128_OP_N128_N128(__m128i, hadd_epi16,   vpaddq_u16,     __m128i, a, __m128i, b, 0)
 DEFINE_N128_OP_N128_N128(__m128i, hadd_epi32,   vpaddq_u32,     __m128i, a, __m128i, b, 0)
-DEFINE_N128_OP_N128_N128(__m128i, hadds_epi16,  vpaddq_s32,     __m128i, a, __m128i, b, 0);
+DEFINE_N128_OP_N128_N128(__m128i, hadds_epi16,  sw_hadds_epi16, __m128i, a, __m128i, b, 0);
 
 // PSUBS PSUBUS
 
@@ -672,9 +698,23 @@ __n128 sw_psubq_u32(__n128 a, const __n128 b)
     return T;
 }
 
+__forceinline
+__n128 sw_hsubs_epi16(__n128 a, const __n128 b)
+{
+    __n128 T;
+
+    for (unsigned i = 0; i < 4; i++)
+        T.n128_u16[i] = _SaturateI16((__int16)a.n128_u16[i+i] - (__int16)a.n128_u16[i+i+1]);
+
+    for (unsigned i = 0; i < 4; i++)
+        T.n128_u16[i+4] = _SaturateI16((__int16)b.n128_u16[i+i] - (__int16)b.n128_u16[i+i+1]);
+
+    return T;
+}
+
 DEFINE_N128_OP_N128_N128(__m128i, hsub_epi16,   sw_psubq_u16,   __m128i, a, __m128i, b, 0)
 DEFINE_N128_OP_N128_N128(__m128i, hsub_epi32,   sw_psubq_u32,   __m128i, a, __m128i, b, 0)
-DEFINE_N128_OP_N128_N128(__m128i, hsubs_epi16,  sw_psubq_u16,   __m128i, a, __m128i, b, 0)
+DEFINE_N128_OP_N128_N128(__m128i, hsubs_epi16,  sw_hsubs_epi16, __m128i, a, __m128i, b, 0)
 
 // PAND PANDN POR PXOR
 
@@ -1090,7 +1130,7 @@ int _mm_movemask_epi8(const __m128i a)
 {
     int mask = 0;
 
-    for (int i = 0; i < 16; i++)
+    for (unsigned i = 0; i < 16; i++)
         mask |= (a.m128i_u8[i] >> 7) << i;
 
     return mask;

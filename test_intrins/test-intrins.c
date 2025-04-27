@@ -223,7 +223,7 @@ void dump_vecs(char *OpName)
         uint64_t OpsPerSec = Iterations * 1000ull / (StopTick - StartTick);
         double   PsecPerOp = 1000000000000.0  / (OpsPerSec + 1);
 
-        printf("%-25s  %9.0f ps/op\n", OpName, PsecPerOp);
+        printf("%-27s  %9.0f ps/op\n", OpName, PsecPerOp);
 
         return;
     }
@@ -301,11 +301,68 @@ void RunTests(void)
     #include "intrin-list.h"
 }
 
+//
+// Helper functions to probe CPUID by register and bit.
+// Borrowed from: https://github.com/softmac/cpuidex
+//
+
+typedef enum CPUID_REGS
+{
+    CPUID_EAX = 0,
+    CPUID_EBX = 1,
+    CPUID_ECX = 2,
+    CPUID_EDX = 3,
+} CPUID_REGS;
+
+__forceinline
+uint32_t LookUpReg(int Function, int Sub, CPUID_REGS Reg)
+{
+    int CpuInfo[4];
+    __cpuidex(CpuInfo, Function, Sub);
+
+    return CpuInfo[Reg];
+}
+
+__forceinline
+uint32_t LookUpRegBit(int Function, int Sub, CPUID_REGS Reg, int Bit)
+{
+    return (LookUpReg(Function, Sub, Reg) >> Bit) & 1;
+}
+
+#if (defined(USE_SOFT_INTRINSICS) && (USE_SOFT_INTRINSICS >= 2))
+__forceinline
+bool HasAVX2()     { return true; }
+#else
+__forceinline
+bool HasAVX2()     { return LookUpRegBit(7, 0, CPUID_EBX,  5); }
+#endif
+
 // for timeBeginPeriod / timeEndPeriod
 #pragma comment(linker, "/defaultlib:winmm")
 
 int main (int argc, char **argv)
 {
+#if defined(__AVX2__)
+
+    //
+    // Do not pass Go if the host CPU or emulated CPU does not support AVX2!
+    //
+    // This will occur on older (pre-Haswell) Intel Core CPUs, on older AMD, and when using Windows on ARM builds prior to build 27744, e.g. 24H2.
+    // See https://blogs.windows.com/windows-insider/2024/11/06/announcing-windows-11-insider-preview-build-27744-canary-channel/
+    //
+    // Windows Insider Canary build 27842 is the minimum recommended as that is the most recent version I tested this week! :-)
+    //
+    // AVX2 support many also not be enabled in 32-bit x86 emulation mode or older version of Rosetta 2.
+    //
+
+    if (!HasAVX2() && !IsProcessorFeaturePresent(PF_AVX2_INSTRUCTIONS_AVAILABLE))
+    {
+        printf("AVX2 is not supported by this x86 CPU, exiting...\n");
+        return 0;
+    }
+
+#endif
+
     for (int argi = 1; argi < argc; argi++)
     {
         if (argv[argi][0] == '%')

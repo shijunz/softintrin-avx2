@@ -8,9 +8,15 @@
 // Compatible with all Intel Core i5/i7, AMD Zen, Prism, and Rosetta 2
 
 // these frst two appear to be missing from the Windows SDK softintrin.h??
-#if MISSING_FROM_WINDOWS_SDK
+#if defined(MISSING_FROM_WINDOWS_SDK)
 DEFINE_TEST_OP_RA  (_mm_cvtss_si64,         __int64,    __m128)
 DEFINE_TEST_OP_RA  (_mm_cvttss_si64,        __int64,    __m128)
+#endif
+
+// these two are not 32-bit x86 compatible
+#if !defined(_M_IX86)
+DEFINE_TEST_OP_RAB (_mm_cvtsi64_sd,         __m128d,    __m128d,    __int64)
+DEFINE_TEST_OP_RAB (_mm_cvtsi64x_sd,        __m128d,    __m128d,    __int64)
 #endif
 
 DEFINE_TEST_OP_RAB (_mm_cvt_si2ss,          __m128,     __m128,     __int32)
@@ -18,8 +24,6 @@ DEFINE_TEST_OP_RA  (_mm_cvt_ss2si,          __int32,    __m128)
 DEFINE_TEST_OP_RA  (_mm_cvtt_ss2si,         __int32,    __m128)
 
 DEFINE_TEST_OP_RAB (_mm_cvtsi32_sd,         __m128d,    __m128d,    __int32)
-DEFINE_TEST_OP_RAB (_mm_cvtsi64_sd,         __m128d,    __m128d,    __int64)
-DEFINE_TEST_OP_RAB (_mm_cvtsi64x_sd,        __m128d,    __m128d,    __int64)
 
 DEFINE_TEST_OP_RA  (_mm_cvtepi32_pd,        __m128d,    __m128i)
 DEFINE_TEST_OP_RA  (_mm_cvtepi32_ps,        __m128,     __m128i)

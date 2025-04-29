@@ -1,3 +1,5 @@
+@if "%1" == "-b" goto bench
+
 @if not "%VSCMD_ARG_TGT_ARCH%" == "arm64" (
     echo Make sure to run vcvarsarm64.bat or vcvarsamd64_arm64.bat first!
     goto done
@@ -19,6 +21,8 @@ cl -FAsc -Zi -O2 -I../dvec_demo -I..          -FI../use_soft_intrinsics.h -Tc te
     echo Skipping running the tests.  Windows on ARM not detected!
     goto done
     )
+
+:bench
 
 if exist test-intrins-aec-sse4.exe  (%LOADER% test-intrins-aec-sse4.exe    -o test-aec-sse4.txt)
 if exist test-intrins-eec-avx2.exe  (%LOADER% test-intrins-eec-avx2.exe    -o test-eec-avx2.txt)

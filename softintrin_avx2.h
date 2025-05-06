@@ -245,8 +245,10 @@ __m128d _mm_set1_pd(double a)
 
 #undef _mm_loadu_pd
 #undef _mm_loadu_ps
+#undef _mm_loadu_si128
 #undef _mm_load_pd
 #undef _mm_load_ps
+#undef _mm_load_si128
 
 #undef _mm_storeu_pd
 #undef _mm_storeu_ps
@@ -307,6 +309,25 @@ __m128 _mm_load_ps(float const  * pa)
     // TODO: for now skip alignment check
 
     return _mm_loadu_ps(pa);
+}
+
+__forceinline
+__m128i _mm_loadu_si128(__m128i const  * pa)
+{
+    __m128i T;
+
+    T.m128i_u64[0] = pa[0].m128i_u64[0];
+    T.m128i_u64[1] = pa[0].m128i_u64[1];
+
+    return T;
+}
+
+__forceinline
+__m128i _mm_load_si128(__m128i const  * pa)
+{
+    // TODO: for now skip alignment check
+
+    return _mm_loadu_si128(pa);
 }
 
 __forceinline
@@ -1712,8 +1733,8 @@ __n256i _nn256_permute2f128_si256 (__n256i a, __n256i b, const int imm8)
 {
     __n256i T;
 
-    T.val[0] = (imm8 & 0x08) ? _nn_set1_ps(0.0f) : ((imm8 & 02) ? b.val[(imm8 & 0x01) >> 0] : a.val[(imm8 & 0x01) >> 0]);
-    T.val[1] = (imm8 & 0x80) ? _nn_set1_ps(0.0f) : ((imm8 & 20) ? b.val[(imm8 & 0x10) >> 4] : a.val[(imm8 & 0x10) >> 4]);
+    T.val[0] = (imm8 & 0x08) ? _nn_set1_ps(0.0f) : ((imm8 & 0x02) ? b.val[(imm8 & 0x01) >> 0] : a.val[(imm8 & 0x01) >> 0]);
+    T.val[1] = (imm8 & 0x80) ? _nn_set1_ps(0.0f) : ((imm8 & 0x20) ? b.val[(imm8 & 0x10) >> 4] : a.val[(imm8 & 0x10) >> 4]);
 
     return T;
 }

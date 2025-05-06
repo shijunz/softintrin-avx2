@@ -1289,8 +1289,8 @@ __m256d _mm256_broadcast_pd(__m128d const * pa)
 
     T.m256d_f64[0] = pa[0].m128d_f64[0];
     T.m256d_f64[1] = pa[0].m128d_f64[1];
-    T.m256d_f64[2] = pa[1].m128d_f64[0];
-    T.m256d_f64[3] = pa[1].m128d_f64[1];
+    T.m256d_f64[2] = pa[0].m128d_f64[0];
+    T.m256d_f64[3] = pa[0].m128d_f64[1];
 
     return T;
 }

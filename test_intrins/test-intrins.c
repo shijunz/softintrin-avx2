@@ -130,6 +130,8 @@ uint64_t BenchmarkMinimum;
 uint64_t Iterations;
 
 char *SearchString;
+char *Source1String;
+char *Source2String;
 
 __declspec(noinline)
 bool init_vecs(char *OpName)
@@ -177,6 +179,20 @@ bool init_vecs(char *OpName)
                 Vsrc[i].__am128d[0 ^ swap] = _mm_set_pd((double)i * -1.4142136, (double)i);
                 Vsrc[i].__am128d[1 ^ swap] = _mm_set_pd((double)i * 3.14159, (double)i * -1.0);
                 break;
+        }
+
+        if ((Source1String != 0) && ((i & 1) == 0))
+        {
+            Vsrc[i].___int64 = strtoll(Source1String, NULL, 0);
+            Vsrc[i].__am128i[0] = _mm_set1_epi64x(Vsrc[i].___int64);
+            Vsrc[i].__am128i[1] = _mm_set1_epi64x(Vsrc[i].___int64);
+        }
+
+        if ((Source2String != 0) && ((i & 1) == 1))
+        {
+            Vsrc[i].___int64 = strtoll(Source2String, NULL, 0);
+            Vsrc[i].__am128i[0] = _mm_set1_epi64x(Vsrc[i].___int64);
+            Vsrc[i].__am128i[1] = _mm_set1_epi64x(Vsrc[i].___int64);
         }
     }
 
@@ -256,8 +272,18 @@ __forceinline void __cdecl test ## op         (unsigned index) { Vout[index]._ #
 #define DEFINE_TEST_OP_RA(op, type_ret, type_a) \
 __forceinline void __cdecl test ## op         (unsigned index) { Vout[index]._ ## type_ret = op ( Vsrc[index + 0]._ ## type_a ); }
 
+// Visual Studio 2022 17.14 generates incorrect -O2 optimization for _mm256_sll_epi* _mm256_srl_epi* _mm256_sra_epi* intrinsics
+// (due to the mix of m256 and m128 data types it seems?) causing unnecessary and incorrect vector register spills to the stack.
+// This workaround using volatile temporarily works around the bugs.  The bug does not occur with -Od or -O1 but lowering the
+// optimization level is not acceptable for micro-benchmarking purposes!
+
 #define DEFINE_TEST_OP_RAB(op, type_ret, type_a, type_b) \
-__forceinline void __cdecl test ## op         (unsigned index) { Vout[index]._ ## type_ret = op ( Vsrc[index + 0]._ ## type_a, Vsrc[index + 1]._ ## type_b ); }
+__forceinline void __cdecl test ## op         (unsigned index) { \
+   if ((sizeof(type_a) == 32) && (sizeof(type_b) == 16)) \
+       { Vout[index]._ ## type_ret = op ( Vsrc[index + 0]._ ## type_a, *(volatile type_b *)&Vsrc[index + 1]._ ## type_b ); } \
+    else \
+       { Vout[index]._ ## type_ret = op ( Vsrc[index + 0]._ ## type_a, Vsrc[index + 1]._ ## type_b ); } \
+}
 
 #define DEFINE_TEST_OP_RABC(op, type_ret, type_a, type_b, type_c) \
 __forceinline void __cdecl test ## op         (unsigned index) { Vout[index]._ ## type_ret = op ( Vsrc[index + 0]._ ## type_a, Vsrc[index + 1]._ ## type_b, Vsrc[index + 2]._ ## type_c ); }
@@ -400,6 +426,20 @@ Usage:
                     goto Usage;
 
                 freopen(argv[argi], "w+", stdout);
+                break;
+
+              case '1':                  // source1 input string
+                if (argc <= ++argi)
+                    goto Usage;
+
+                Source1String = argv[argi];
+                break;
+
+              case '2':                  // source2 input string
+                if (argc <= ++argi)
+                    goto Usage;
+
+                Source2String = argv[argi];
                 break;
             }
         }

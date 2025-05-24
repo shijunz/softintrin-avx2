@@ -494,7 +494,7 @@ __n128 _nn_postprocess(__n128 T, __n128 a, const __n128 b, int flags)
 __forceinline
 __int16 _SaturateI16(__int32 a)
 {
-    return (a < -32768) ? -32768 : (a > 32767) ? 32767 : a;
+    return (__int16)((a < -32768) ? -32768 : (a > 32767) ? 32767 : a);
 }
 
 //
@@ -979,6 +979,89 @@ __m128 _mm_sqrt_ss(__m128 a)
     return _nn128_castn128_ps( _nn_sqrt_ss(_nn128_castps_n128(a)) );
 }
 
+// PSLLV PSRLV PSRARV
+
+#undef _mm_sllv_epi32
+#undef _mm_sllv_epi64
+#undef _mm_srav_epi32
+#undef _mm_srlv_epi32
+#undef _mm_srlv_epi64
+
+__forceinline
+__n128i sw_sllv_epi32(__n128i a, const __n128i b)
+{
+    // Limit over-shifting to 32 bits to force zeroes in those slots
+
+    __n128i Bounds = vmovq_n_u32(32);
+    __n128i T = vminq_u32(Bounds, b);
+
+    T = vshlq_u32(a, T);
+
+    return T;
+}
+
+__forceinline
+__n128i sw_sllv_epi64(__n128i a, const __n128i b)
+{
+    // There is no vminq_u64 intrinsic, so instead clip the shift count
+    // using saturating addition followed by subtraction.  The original
+    // shift count will result if it was in range to begin with.
+
+    __n128i Bounds = vmovq_n_s64(-65);
+    __n128i T = vsubq_u64(vqaddq_u64(Bounds, b), Bounds);
+
+    T = vshlq_u64(a, T);
+
+    return T;
+}
+
+__forceinline
+__n128i sw_srav_epi32(__n128i a, const __n128i b)
+{
+    // Limit over-shifting to 32 bits to force zeroes in those slots
+
+    __n128i Bounds = vmovq_n_u32(32);
+    __n128i T = vminq_u32(Bounds, b);
+
+    T = vshlq_s32(a, vnegq_s32(T)); // shift right = shift left by negative count
+
+    return T;
+}
+
+__forceinline
+__n128i sw_srlv_epi32(__n128i a, const __n128i b)
+{
+    // Limit over-shifting to 32 bits to force zeroes in those slots
+
+    __n128i Bounds = vmovq_n_u32(32);
+    __n128i T = vminq_u32(Bounds, b);
+
+    T = vshlq_u32(a, vnegq_s32(T)); // shift right = shift left by negative count
+
+    return T;
+}
+
+__forceinline
+__n128i sw_srlv_epi64(__n128i a, const __n128i b)
+{
+    // There is no vminq_u64 intrinsic, so instead clip the shift count
+    // using saturating addition followed by subtraction.  The original
+    // shift count will result if it was in range to begin with.
+
+    __n128i Bounds = vmovq_n_s64(-65);
+    __n128i T = vsubq_u64(vqaddq_u64(Bounds, b), Bounds);
+
+    T = vshlq_u64(a, vnegq_s64(T)); // shift right = shift left by negative count
+
+    return T;
+}
+
+DEFINE_N128_OP_N128_N128(__m128i, sllv_epi32,   sw_sllv_epi32,  __m128i, a, __m128i, b, 0)
+DEFINE_N128_OP_N128_N128(__m128i, sllv_epi64,   sw_sllv_epi64,  __m128i, a, __m128i, b, 0)
+DEFINE_N128_OP_N128_N128(__m128i, srav_epi32,   sw_srav_epi32,  __m128i, a, __m128i, b, 0)
+DEFINE_N128_OP_N128_N128(__m128i, srlv_epi32,   sw_srlv_epi32,  __m128i, a, __m128i, b, 0)
+DEFINE_N128_OP_N128_N128(__m128i, srlv_epi64,   sw_srlv_epi64,  __m128i, a, __m128i, b, 0)
+
 // PSHUFD
 
 #undef _mm_shuffle_epi32
@@ -1232,10 +1315,12 @@ SIMD_REINTERPRET_CAST(_mm256_castps256_ps128, __m128,   __m256)
 SIMD_REINTERPRET_CAST(_nn256_castn256_pd,     __m256d,  __n128x2)
 SIMD_REINTERPRET_CAST(_nn256_castn256_ps,     __m256,   __n128x2)
 SIMD_REINTERPRET_CAST(_nn256_castn256_si256,  __m256i,  __n128x2)
+SIMD_REINTERPRET_CAST(_nn256_castn256_si128,  __m128i,  __n128x2)
 
 SIMD_REINTERPRET_CAST(_nn256_castpd_n256,     __n128x2, __m256d)
 SIMD_REINTERPRET_CAST(_nn256_castps_n256,     __n128x2, __m256)
 SIMD_REINTERPRET_CAST(_nn256_castsi256_n256,  __n128x2, __m256i)
+SIMD_REINTERPRET_CAST(_nn256_castsi256_n128,  __n128,   __m256i)
 
 // initialization and broadcasts
 
@@ -1301,6 +1386,13 @@ __forceinline
 __m256 _mm256_set1_ps(float _F0)
 {
     return _mm256_set_ps(_F0, _F0, _F0, _F0, _F0, _F0, _F0, _F0);
+}
+
+__forceinline
+__m256i _mm256_setzero_si256(void)
+{
+    __m256i T = { 0, 0, 0, 0, 0, 0, 0, 0 };
+    return T;
 }
 
 __forceinline
@@ -1807,6 +1899,8 @@ __m256 _mm256_movehdup_ps(__m256 a)
 
 // VCVT variants
 
+// VCVTDQ2PD
+
 __forceinline
 __n128x2 _nn256_sw_cvtepi32_pd(__n128i a)
 {
@@ -1833,6 +1927,8 @@ __n128x2 _nn256_cvtepi32_pd(__n128i a)
 }
 #endif
 
+// VCVTDQ2PS
+
 __forceinline
 __m256d _mm256_cvtepi32_pd(__m128i a)
 {
@@ -1844,14 +1940,14 @@ __n256 _nn256_sw_cvtepi32_ps(__n256i a)
 {
     __n256 T;
 
-    T.val[0].n128_f32[0] = (float)a.val[0].n128_u32[0];
-    T.val[0].n128_f32[1] = (float)a.val[0].n128_u32[1];
-    T.val[0].n128_f32[2] = (float)a.val[0].n128_u32[2];
-    T.val[0].n128_f32[3] = (float)a.val[0].n128_u32[3];
-    T.val[1].n128_f32[0] = (float)a.val[1].n128_u32[0];
-    T.val[1].n128_f32[1] = (float)a.val[1].n128_u32[1];
-    T.val[1].n128_f32[2] = (float)a.val[1].n128_u32[2];
-    T.val[1].n128_f32[3] = (float)a.val[1].n128_u32[3];
+    T.val[0].n128_f32[0] = (float)(__int32)a.val[0].n128_u32[0];
+    T.val[0].n128_f32[1] = (float)(__int32)a.val[0].n128_u32[1];
+    T.val[0].n128_f32[2] = (float)(__int32)a.val[0].n128_u32[2];
+    T.val[0].n128_f32[3] = (float)(__int32)a.val[0].n128_u32[3];
+    T.val[1].n128_f32[0] = (float)(__int32)a.val[1].n128_u32[0];
+    T.val[1].n128_f32[1] = (float)(__int32)a.val[1].n128_u32[1];
+    T.val[1].n128_f32[2] = (float)(__int32)a.val[1].n128_u32[2];
+    T.val[1].n128_f32[3] = (float)(__int32)a.val[1].n128_u32[3];
 
     return T;
 }
@@ -1862,6 +1958,7 @@ __m256 _mm256_cvtepi32_ps(__m256i a)
     return _nn256_castn256_ps( _nn256_sw_cvtepi32_ps(_nn256_castsi256_n256(a)) );
 }
 
+// VCVTPS2PD
 
 __forceinline
 __n128x2 _nn256_sw_cvtps_pd(__n128 a)
@@ -1893,6 +1990,50 @@ __m256d _mm256_cvtps_pd(__m128 a)
     return _nn256_castn256_pd( _nn256_cvtps_pd(_nn128_castps_n128(a)) );
 }
 
+// VCVTPD2DQ
+
+__forceinline
+__n128i _nn256_sw_cvtpd_epi32(__n256d a)
+{
+    __n128 T;
+
+    T.n128_u32[0] = (__int32)a.val[0].n128_f64[0];
+    T.n128_u32[1] = (__int32)a.val[0].n128_f64[1];
+    T.n128_u32[2] = (__int32)a.val[1].n128_f64[0];
+    T.n128_u32[3] = (__int32)a.val[1].n128_f64[1];
+
+    return T;
+}
+
+__forceinline
+__m128i _mm256_cvtpd_epi32(__m256d a)
+{
+    return _nn128_castn128_si128( _nn256_sw_cvtpd_epi32(_nn256_castpd_n256(a)) );
+}
+
+// VCVTTPD2DQ
+
+__forceinline
+__n128i _nn256_sw_cvttpd_epi32(__n256d a)
+{
+    __n128 T;
+
+    T.n128_u32[0] = (__int32)a.val[0].n128_f64[0];
+    T.n128_u32[1] = (__int32)a.val[0].n128_f64[1];
+    T.n128_u32[2] = (__int32)a.val[1].n128_f64[0];
+    T.n128_u32[3] = (__int32)a.val[1].n128_f64[1];
+
+    return T;
+}
+
+__forceinline
+__m128i _mm256_cvttpd_epi32(__m256d a)
+{
+    return _nn128_castn128_si128( _nn256_sw_cvttpd_epi32(_nn256_castpd_n256(a)) );
+}
+
+// VCVTPD2PS
+
 __forceinline
 __n128 _nn256_sw_cvtpd_ps(__n128x2 a)
 {
@@ -1920,7 +2061,209 @@ __m128 _mm256_cvtpd_ps(__m256d a)
     return _nn128_castn128_ps( _nn256_cvtpd_ps(_nn256_castpd_n256(a)) );
 }
 
-// double-wide placeholders to optimize later
+// VPSLL VPSRL VPSRA
+
+__forceinline
+__n256i _nn256_sw_sli_si256(__n256i a, const int imm8)
+{
+    __n256 T;
+
+    for (unsigned i = 0; i < 16; i++)
+    {
+        unsigned FromLane = (i + imm8);
+
+        T.val[0].n128_i8[i] = (FromLane >= 16) ? 0 : a.val[0].n128_i8[FromLane];
+        T.val[1].n128_i8[i] = (FromLane >= 16) ? 0 : a.val[1].n128_i8[FromLane];
+    }
+
+    return T;
+}
+
+__forceinline
+__n256i _nn256_slli_si256(__n256i a, const int imm8)
+{
+    return _nn256_sw_sli_si256(a, -imm8);
+}
+
+__forceinline
+__n256i _nn256_srli_si256(__n256i a, const int imm8)
+{
+    return _nn256_sw_sli_si256(a, +imm8);
+}
+
+__forceinline
+__m256i _mm256_slli_si256(__m256i a, const int imm8)
+{
+    return _nn256_castn256_si256( _nn256_slli_si256(_nn256_castsi256_n256(a), imm8 ) );
+}
+
+__forceinline
+__m256i _mm256_srli_si256(__m256i a, const int imm8)
+{
+    return _nn256_castn256_si256( _nn256_srli_si256(_nn256_castsi256_n256(a), imm8 ) );
+}
+
+//
+// Double-wide AVX operations derived by doubling existing SSE operations
+//
+
+//
+// Template for double-wide 256-bit dest,source1 vector instructions
+//
+
+#define DEFINE_M256_OP_M256(rettype, rettype128, name, arg1type, arg1type128) \
+\
+__forceinline __n128x2 _nn256_ ## name (__n128x2 a) \
+{ \
+    __n128x2 T; \
+    T.val[0] = __n128_from_ ## rettype128 ( _mm_ ## name( arg1type128 ## _from___n128(a.val[0]) ) ); \
+    T.val[1] = __n128_from_ ## rettype128 ( _mm_ ## name( arg1type128 ## _from___n128(a.val[1]) ) ); \
+    return T; \
+} \
+\
+__forceinline rettype _mm256_ ## name (arg1type arg1) \
+{ \
+    return rettype ## _from___n128x2 ( _nn256_ ## name ( __n128x2_from_ ## arg1type (arg1) ) ); \
+}
+
+// VCVTPS2DQ
+// VCVTTPS2DQ
+
+DEFINE_M256_OP_M256(__m256i, __m128i, cvtps_epi32,   __m256 , __m128 )
+DEFINE_M256_OP_M256(__m256i, __m128i, cvttps_epi32,  __m256 , __m128 )
+
+// VRCPPS
+// VRSQRTPS
+
+DEFINE_M256_OP_M256(__m256 , __m128 , rcp_ps,        __m256 , __m128 )
+DEFINE_M256_OP_M256(__m256 , __m128 , rsqrt_ps,      __m256 , __m128 )
+
+//
+// Template for double-wide 256-bit dest,source1,imm8 vector instructions
+//
+
+#define DEFINE_M256_OP_M256_IMM8(rettype, rettype128, name, arg1type, arg1type128) \
+\
+__forceinline __n128x2 _nn256_ ## name (__n128x2 a, const int imm8) \
+{ \
+    __n128x2 T; \
+    T.val[0] = __n128_from_ ## rettype128 ( _mm_ ## name( arg1type128 ## _from___n128(a.val[0]), imm8 ) ); \
+    T.val[1] = __n128_from_ ## rettype128 ( _mm_ ## name( arg1type128 ## _from___n128(a.val[1]), imm8 ) ); \
+    return T; \
+} \
+\
+__forceinline rettype _mm256_ ## name (arg1type arg1, const int imm8) \
+{ \
+    return rettype ## _from___n128x2 ( _nn256_ ## name ( __n128x2_from_ ## arg1type (arg1), imm8 ) ); \
+}
+
+DEFINE_M256_OP_M256_IMM8(__m256i, __m128i, shuffle_epi32, __m256i, __m128i)
+
+DEFINE_M256_OP_M256_IMM8(__m256i, __m128i, slli_epi16,    __m256i, __m128i)
+DEFINE_M256_OP_M256_IMM8(__m256i, __m128i, slli_epi32,    __m256i, __m128i)
+DEFINE_M256_OP_M256_IMM8(__m256i, __m128i, slli_epi64,    __m256i, __m128i)
+
+DEFINE_M256_OP_M256_IMM8(__m256i, __m128i, srai_epi16,    __m256i, __m128i)
+DEFINE_M256_OP_M256_IMM8(__m256i, __m128i, srai_epi32,    __m256i, __m128i)
+
+DEFINE_M256_OP_M256_IMM8(__m256i, __m128i, srli_epi16,    __m256i, __m128i)
+DEFINE_M256_OP_M256_IMM8(__m256i, __m128i, srli_epi32,    __m256i, __m128i)
+DEFINE_M256_OP_M256_IMM8(__m256i, __m128i, srli_epi64,    __m256i, __m128i)
+
+//
+// Template for double-wide 256-bit dest,source1,source2 vector instructions
+// Variants for source2 is 128-bit and 256-bit
+//
+
+#define DEFINE_M256_OP_M256_M128(rettype, rettype128, name, arg1type, arg1type128, arg2type, arg2type128) \
+\
+__forceinline __n128x2 _nn256_ ## name (__n128x2 a, const __n128 b) \
+{ \
+    __n128x2 T; \
+    T.val[0] = __n128_from_ ## rettype128 ( _mm_ ## name( arg1type128 ## _from___n128(a.val[0]), arg2type128 ## _from___n128(b) ) ); \
+    T.val[1] = __n128_from_ ## rettype128 ( _mm_ ## name( arg1type128 ## _from___n128(a.val[1]), arg2type128 ## _from___n128(b) ) ); \
+    return T; \
+} \
+\
+__forceinline rettype _mm256_ ## name (arg1type arg1, arg2type arg2) \
+{ \
+    return rettype ## _from___n128x2 ( _nn256_ ## name ( __n128x2_from_ ## arg1type (arg1), __n128_from_ ## arg2type (arg2) ) ); \
+}
+
+DEFINE_M256_OP_M256_M128(__m256i, __m128i, sll_epi16,     __m256i, __m128i, __m128i, __m128i)
+DEFINE_M256_OP_M256_M128(__m256i, __m128i, sll_epi32,     __m256i, __m128i, __m128i, __m128i)
+DEFINE_M256_OP_M256_M128(__m256i, __m128i, sll_epi64,     __m256i, __m128i, __m128i, __m128i)
+
+DEFINE_M256_OP_M256_M128(__m256i, __m128i, sra_epi16,     __m256i, __m128i, __m128i, __m128i)
+DEFINE_M256_OP_M256_M128(__m256i, __m128i, sra_epi32,     __m256i, __m128i, __m128i, __m128i)
+
+DEFINE_M256_OP_M256_M128(__m256i, __m128i, srl_epi16,     __m256i, __m128i, __m128i, __m128i)
+DEFINE_M256_OP_M256_M128(__m256i, __m128i, srl_epi32,     __m256i, __m128i, __m128i, __m128i)
+DEFINE_M256_OP_M256_M128(__m256i, __m128i, srl_epi64,     __m256i, __m128i, __m128i, __m128i)
+
+#define DEFINE_M256_OP_M256_M256(rettype, rettype128, name, arg1type, arg1type128, arg2type, arg2type128) \
+\
+__forceinline __n128x2 _nn256_ ## name (__n128x2 a, const __n128x2 b) \
+{ \
+    __n128x2 T; \
+    T.val[0] = __n128_from_ ## rettype128 ( _mm_ ## name( arg1type128 ## _from___n128(a.val[0]), arg2type128 ## _from___n128(b.val[0]) ) ); \
+    T.val[1] = __n128_from_ ## rettype128 ( _mm_ ## name( arg1type128 ## _from___n128(a.val[1]), arg2type128 ## _from___n128(b.val[1]) ) ); \
+    return T; \
+} \
+\
+__forceinline rettype _mm256_ ## name (arg1type arg1, arg2type arg2) \
+{ \
+    return rettype ## _from___n128x2 ( _nn256_ ## name ( __n128x2_from_ ## arg1type (arg1), __n128x2_from_ ## arg2type (arg2) ) ); \
+}
+
+DEFINE_M256_OP_M256_M256(__m256i, __m128i, mulhi_epi16,   __m256i, __m128i, __m256i, __m128i)
+DEFINE_M256_OP_M256_M256(__m256i, __m128i, mulhi_epu16,   __m256i, __m128i, __m256i, __m128i)
+DEFINE_M256_OP_M256_M256(__m256i, __m128i, mulhrs_epi16,  __m256i, __m128i, __m256i, __m128i)
+
+DEFINE_M256_OP_M256_M256(__m256i, __m128i, sad_epu8,      __m256i, __m128i, __m256i, __m128i)
+DEFINE_M256_OP_M256_M256(__m256i, __m128i, shuffle_epi8,  __m256i, __m128i, __m256i, __m128i)
+
+DEFINE_M256_OP_M256_M256(__m256i, __m128i, sllv_epi32,    __m256i, __m128i, __m256i, __m128i)
+DEFINE_M256_OP_M256_M256(__m256i, __m128i, sllv_epi64,    __m256i, __m128i, __m256i, __m128i)
+
+DEFINE_M256_OP_M256_M256(__m256i, __m128i, srav_epi32,    __m256i, __m128i, __m256i, __m128i)
+
+DEFINE_M256_OP_M256_M256(__m256i, __m128i, srlv_epi32,    __m256i, __m128i, __m256i, __m128i)
+DEFINE_M256_OP_M256_M256(__m256i, __m128i, srlv_epi64,    __m256i, __m128i, __m256i, __m128i)
+
+DEFINE_M256_OP_M256_M256(__m256d, __m128d, addsub_pd,     __m256d, __m128d, __m256d, __m128d)
+DEFINE_M256_OP_M256_M256(__m256 , __m128 , addsub_ps,     __m256 , __m128 , __m256 , __m128 )
+DEFINE_M256_OP_M256_M256(__m256d, __m128d, hsub_pd,       __m256d, __m128d, __m256d, __m128d)
+DEFINE_M256_OP_M256_M256(__m256 , __m128 , hsub_ps,       __m256 , __m128 , __m256 , __m128 )
+
+//
+// Template for double-wide 256-bit dest,source1,source2,imm8 vector instructions
+//
+
+#define DEFINE_M256_OP_M256_M256_IMM8(rettype, rettype128, name, arg1type, arg1type128, arg2type, arg2type128, hish) \
+\
+__forceinline __n128x2 _nn256_ ## name (__n128x2 a, const __n128x2 b, const int imm8) \
+{ \
+    __n128x2 T; \
+    T.val[0] = __n128_from_ ## rettype128 ( _mm_ ## name( arg1type128 ## _from___n128(a.val[0]), arg2type128 ## _from___n128(b.val[0]), imm8 ) ); \
+    T.val[1] = __n128_from_ ## rettype128 ( _mm_ ## name( arg1type128 ## _from___n128(a.val[1]), arg2type128 ## _from___n128(b.val[1]), imm8 >> hish ) ); \
+    return T; \
+} \
+\
+__forceinline rettype _mm256_ ## name (arg1type arg1, arg2type arg2, const int imm8) \
+{ \
+    return rettype ## _from___n128x2 ( _nn256_ ## name ( __n128x2_from_ ## arg1type (arg1), __n128x2_from_ ## arg2type (arg2), imm8 ) ); \
+}
+
+DEFINE_M256_OP_M256_M256_IMM8(__m256d, __m128d, blend_pd,      __m256d, __m128d, __m256d, __m128d, 2)
+DEFINE_M256_OP_M256_M256_IMM8(__m256 , __m128 , blend_ps,      __m256 , __m128 , __m256 , __m128 , 4)
+DEFINE_M256_OP_M256_M256_IMM8(__m256i, __m128i, blend_epi16,   __m256i, __m128i, __m256i, __m128i, 0)
+// DEFINE_M256_OP_M256_M256_IMM8(__m256i, __m128i, blend_epi32,   __m256i, __m128i, __m256i, __m128i, 4)
+
+DEFINE_M256_OP_M256_M256_IMM8(__m256 , __m128 , dp_ps,         __m256 , __m128 , __m256 , __m128 , 0)
+
+DEFINE_M256_OP_M256_M256_IMM8(__m256d, __m128d, shuffle_pd,    __m256d, __m128d, __m256d, __m128d, 2)
+DEFINE_M256_OP_M256_M256_IMM8(__m256 , __m128 , shuffle_ps,    __m256 , __m128 , __m256 , __m128 , 0)
 
 
 #pragma strict_gs_check(pop)

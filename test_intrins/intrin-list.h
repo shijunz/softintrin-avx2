@@ -194,15 +194,37 @@ DEFINE_TEST_OP_RAB (_mm_sll_epi32,          __m128i,    __m128i,    __m128i)
 DEFINE_TEST_OP_RAB (_mm_srl_epi32,          __m128i,    __m128i,    __m128i)
 DEFINE_TEST_OP_RAB (_mm_sra_epi32,          __m128i,    __m128i,    __m128i)
 
+DEFINE_TEST_OP_RAB (_mm_sll_epi64,          __m128i,    __m128i,    __m128i)
+DEFINE_TEST_OP_RAB (_mm_srl_epi64,          __m128i,    __m128i,    __m128i)
+
+DEFINE_TEST_OP_RAI (_mm_slli_epi16,         __m128i,    __m128i,    1)
 DEFINE_TEST_OP_RAI (_mm_slli_epi16,         __m128i,    __m128i,    7)
+DEFINE_TEST_OP_RAI (_mm_slli_epi16,         __m128i,    __m128i,    20)
+DEFINE_TEST_OP_RAI (_mm_srli_epi16,         __m128i,    __m128i,    1)
 DEFINE_TEST_OP_RAI (_mm_srli_epi16,         __m128i,    __m128i,    11)
+DEFINE_TEST_OP_RAI (_mm_srli_epi16,         __m128i,    __m128i,    20)
+DEFINE_TEST_OP_RAI (_mm_srai_epi16,         __m128i,    __m128i,    1)
 DEFINE_TEST_OP_RAI (_mm_srai_epi16,         __m128i,    __m128i,    15)
+DEFINE_TEST_OP_RAI (_mm_srai_epi16,         __m128i,    __m128i,    20)
 
+DEFINE_TEST_OP_RAI (_mm_slli_epi32,         __m128i,    __m128i,    1)
 DEFINE_TEST_OP_RAI (_mm_slli_epi32,         __m128i,    __m128i,    7)
+DEFINE_TEST_OP_RAI (_mm_slli_epi32,         __m128i,    __m128i,    40)
+DEFINE_TEST_OP_RAI (_mm_srli_epi32,         __m128i,    __m128i,    1)
 DEFINE_TEST_OP_RAI (_mm_srli_epi32,         __m128i,    __m128i,    15)
+DEFINE_TEST_OP_RAI (_mm_srli_epi32,         __m128i,    __m128i,    40)
+DEFINE_TEST_OP_RAI (_mm_srai_epi32,         __m128i,    __m128i,    1)
 DEFINE_TEST_OP_RAI (_mm_srai_epi32,         __m128i,    __m128i,    31)
+DEFINE_TEST_OP_RAI (_mm_srai_epi32,         __m128i,    __m128i,    40)
 
+DEFINE_TEST_OP_RAI (_mm_slli_epi64,         __m128i,    __m128i,    14)
+DEFINE_TEST_OP_RAI (_mm_slli_epi64,         __m128i,    __m128i,    74)
+DEFINE_TEST_OP_RAI (_mm_srli_epi64,         __m128i,    __m128i,    28)
+DEFINE_TEST_OP_RAI (_mm_srli_epi64,         __m128i,    __m128i,    78)
+
+DEFINE_TEST_OP_RAI (_mm_slli_si128,         __m128i,    __m128i,    1)
 DEFINE_TEST_OP_RAI (_mm_slli_si128,         __m128i,    __m128i,    15)
+DEFINE_TEST_OP_RAI (_mm_srli_si128,         __m128i,    __m128i,    1)
 DEFINE_TEST_OP_RAI (_mm_srli_si128,         __m128i,    __m128i,    15)
 
 // SSE/SSE2/SSE3 data movement
@@ -244,7 +266,7 @@ DEFINE_TEST_OP_R   (_mm_undefined_pd,       __m128d)
 DEFINE_TEST_OP_R   (_mm_undefined_ps,       __m128)
 DEFINE_TEST_OP_R   (_mm_undefined_si128,    __m128i)
 
-#if defined(__AVX2__) //  not quite ready to test 256-bit soft intrinsics :-)  || (defined(USE_SOFT_INTRINSICS) && (USE_SOFT_INTRINSICS >= 2))
+#if defined(__AVX2__) || (defined(USE_SOFT_INTRINSICS) && (USE_SOFT_INTRINSICS >= 2))
 
 // Arithmetic AVX/AVX2
 // Requires Intel Core i5/i7 4th gen (Haswell) and up, AMD Zen,
@@ -398,17 +420,52 @@ DEFINE_TEST_OP_RAB (_mm256_sll_epi32,       __m256i,    __m256i,    __m128i)
 DEFINE_TEST_OP_RAB (_mm256_srl_epi32,       __m256i,    __m256i,    __m128i)
 DEFINE_TEST_OP_RAB (_mm256_sra_epi32,       __m256i,    __m256i,    __m128i)
 
+DEFINE_TEST_OP_RAB (_mm256_sll_epi64,       __m256i,    __m256i,    __m128i)
+DEFINE_TEST_OP_RAB (_mm256_srl_epi64,       __m256i,    __m256i,    __m128i)
+
+DEFINE_TEST_OP_RAB (_mm_sllv_epi32,         __m128i,    __m128i,    __m128i)
+DEFINE_TEST_OP_RAB (_mm_srlv_epi32,         __m128i,    __m128i,    __m128i)
+DEFINE_TEST_OP_RAB (_mm_srav_epi32,         __m128i,    __m128i,    __m128i)
+
+DEFINE_TEST_OP_RAB (_mm_sllv_epi64,         __m128i,    __m128i,    __m128i)
+DEFINE_TEST_OP_RAB (_mm_srlv_epi64,         __m128i,    __m128i,    __m128i)
+
 DEFINE_TEST_OP_RAB (_mm256_sllv_epi32,      __m256i,    __m256i,    __m256i)
 DEFINE_TEST_OP_RAB (_mm256_srlv_epi32,      __m256i,    __m256i,    __m256i)
 DEFINE_TEST_OP_RAB (_mm256_srav_epi32,      __m256i,    __m256i,    __m256i)
 
-DEFINE_TEST_OP_RAI (_mm256_slli_epi16,      __m256i,    __m256i,    7)
-DEFINE_TEST_OP_RAI (_mm256_srli_epi16,      __m256i,    __m256i,    11)
-DEFINE_TEST_OP_RAI (_mm256_srai_epi16,      __m256i,    __m256i,    15)
+DEFINE_TEST_OP_RAB (_mm256_sllv_epi64,      __m256i,    __m256i,    __m256i)
+DEFINE_TEST_OP_RAB (_mm256_srlv_epi64,      __m256i,    __m256i,    __m256i)
 
+DEFINE_TEST_OP_RAI (_mm256_slli_epi16,      __m256i,    __m256i,    1)
+DEFINE_TEST_OP_RAI (_mm256_slli_epi16,      __m256i,    __m256i,    7)
+DEFINE_TEST_OP_RAI (_mm256_slli_epi16,      __m256i,    __m256i,    20)
+DEFINE_TEST_OP_RAI (_mm256_srli_epi16,      __m256i,    __m256i,    1)
+DEFINE_TEST_OP_RAI (_mm256_srli_epi16,      __m256i,    __m256i,    11)
+DEFINE_TEST_OP_RAI (_mm256_srli_epi16,      __m256i,    __m256i,    20)
+DEFINE_TEST_OP_RAI (_mm256_srai_epi16,      __m256i,    __m256i,    1)
+DEFINE_TEST_OP_RAI (_mm256_srai_epi16,      __m256i,    __m256i,    15)
+DEFINE_TEST_OP_RAI (_mm256_srai_epi16,      __m256i,    __m256i,    20)
+
+DEFINE_TEST_OP_RAI (_mm256_slli_epi32,      __m256i,    __m256i,    1)
 DEFINE_TEST_OP_RAI (_mm256_slli_epi32,      __m256i,    __m256i,    7)
+DEFINE_TEST_OP_RAI (_mm256_slli_epi32,      __m256i,    __m256i,    40)
+DEFINE_TEST_OP_RAI (_mm256_srli_epi32,      __m256i,    __m256i,    1)
 DEFINE_TEST_OP_RAI (_mm256_srli_epi32,      __m256i,    __m256i,    15)
+DEFINE_TEST_OP_RAI (_mm256_srli_epi32,      __m256i,    __m256i,    40)
+DEFINE_TEST_OP_RAI (_mm256_srai_epi32,      __m256i,    __m256i,    1)
 DEFINE_TEST_OP_RAI (_mm256_srai_epi32,      __m256i,    __m256i,    31)
+DEFINE_TEST_OP_RAI (_mm256_srai_epi32,      __m256i,    __m256i,    40)
+
+DEFINE_TEST_OP_RAI (_mm256_slli_epi64,      __m256i,    __m256i,    7)
+DEFINE_TEST_OP_RAI (_mm256_slli_epi64,      __m256i,    __m256i,    67)
+DEFINE_TEST_OP_RAI (_mm256_srli_epi64,      __m256i,    __m256i,    15)
+DEFINE_TEST_OP_RAI (_mm256_srli_epi64,      __m256i,    __m256i,    75)
+
+DEFINE_TEST_OP_RAI (_mm256_slli_si256,      __m256i,    __m256i,    1)
+DEFINE_TEST_OP_RAI (_mm256_slli_si256,      __m256i,    __m256i,    31)
+DEFINE_TEST_OP_RAI (_mm256_srli_si256,      __m256i,    __m256i,    1)
+DEFINE_TEST_OP_RAI (_mm256_srli_si256,      __m256i,    __m256i,    31)
 
 // AVX/AVX2 data movement
 
@@ -456,13 +513,11 @@ DEFINE_TEST_OP_VAB (_mm256_storeu_ps,                   pfloat,     __m256)
 
 DEFINE_TEST_OP_RA  (_mm_abs_epi64,          __m128i,    __m128i)
 
-DEFINE_TEST_OP_RAI (_mm_slli_epi64,         __m128i,    __m128i,    7)
-DEFINE_TEST_OP_RAI (_mm_srli_epi64,         __m128i,    __m128i,    47)
 DEFINE_TEST_OP_RAI (_mm_srai_epi64,         __m128i,    __m128i,    63)
 
-DEFINE_TEST_OP_RAB (_mm256_sllv_epi64,      __m256i,    __m256i,    __m256i)
-DEFINE_TEST_OP_RAB (_mm256_srlv_epi64,      __m256i,    __m256i,    __m256i)
-DEFINE_TEST_OP_RAB (_mm256_srav_epi64,      __m256i,    __m256i,    __m256i)
+DEFINE_TEST_OP_RAB (_mm256_sllv_epi16,      __m256i,    __m256i,    __m256i)
+DEFINE_TEST_OP_RAB (_mm256_srlv_epi16,      __m256i,    __m256i,    __m256i)
+DEFINE_TEST_OP_RAB (_mm256_srav_epi16,      __m256i,    __m256i,    __m256i)
 
 #endif // AVX-512 tests
 
